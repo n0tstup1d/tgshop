@@ -76,13 +76,41 @@ class DatabaseBot:
                     res = await cursor.fetchone()
                     return bool(res)
 
+    async def check_users_sub(self, user_id):
+            async with self.lock:
+                async with self.db.execute('SELECT sub_date FROM users WHERE user_id = ?', (user_id,)) as cursor:
+                    res = await cursor.fetchone()
+                    return str(res)
+
+    async def check_users_mon(self, user_id):
+            async with self.lock:
+                async with self.db.execute('SELECT balance FROM users WHERE user_id = ?', (user_id,)) as cursor:
+                    res = await cursor.fetchone()
+                    return float(res)
+
+    async def add_sum(self, user_id, money):
+        async with self.lock:
+            await self.db.execute('UPDATE users SET balance = ? WHERE user_id = ?', ( int(money) , user_id))
+            await self.db.commit()
+
+    async def update_sum(self, user_id, final_balance):
+        async with self.lock:
+            await self.db.execute('UPDATE users SET balance = ? WHERE user_id = ?', ( final_balance , user_id))
+            await self.db.commit()
+
+    async def get_user_bal(self, user_id):
+        async with self.lock:
+            async with self.db.execute('SELECT * FROM users WHERE user_id = ?', (user_id,)) as cursor:
+                res = await cursor.fetchone()
+                return res
+
     async def insert_user(self, user_id, date_reg, arg):
 
             async with self.lock:
                 await self.db.execute('''
                     INSERT OR IGNORE INTO users (user_id, data_reg, sub_date, balance)
                     VALUES (?, ?, ?, ?)
-                ''', (user_id, date_reg, 0, 0,))
+                ''', (user_id, date_reg, arg, 0,))
                 await self.db.commit()
 
 async def main():
