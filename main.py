@@ -98,8 +98,8 @@ async def text(message:types.Message):
     if message.text == "🛒 Магазин":
         '''async with db.DatabaseBot("Database/bd.db") as db_bot:
             res = await db_bot.get_accont()'''
-        await bot.send_message(message.chat.id, f"--------- В наличии ---------\n",
-                                                reply_markup=user_kb.main_menu)
+        await bot.send_message(message.chat.id, f"--------------- В наличии ---------------\n",
+                                                reply_markup=await user_kb.shop_menu_acc())
 
         print()
 
@@ -148,10 +148,102 @@ async def call(call: CallbackQuery):
                                     call.message.chat.id, call.message.message_id,
                                     reply_markup=adm_kb.cancel_adm_give_sum)
         await states.adm_states.get_sum_id.set()
-    elif call.data == 'shopaccadd':
-        await bot.edit_message_text('Список существующих стран в магазине и их список:\n',
-                                    call.message.chat.id, call.message.message_id,
-                                    reply_markup=adm_kb.cancel_adm_give_sum)
+    elif call.data == 'shopacc':
+        message = 'Список существующих стран в магазине и их список:\n'
+        with open('accounts.txt', 'r') as file:
+            lines = file.readlines()
+        region_counts = {}
+        for line in lines:
+            region = line.split(':')[0]
+            if region in region_counts:
+                region_counts[region] += 1
+            else:
+                region_counts[region] = 1
+        for region, count in region_counts.items():
+            print(f"{region} | {count}")
+            message += f"{region} | {count}\n"
+        await bot.edit_message_text(message,call.message.chat.id, call.message.message_id,
+                                    reply_markup=adm_kb.adm_menu_acc_shop)
+    elif call.data == 'SettingsGeo':
+        async with db.DatabaseBot("DataBase/db.db") as db_bot:
+            countries = await db_bot.get_countries_acc()
+        message = "Список регионов и их цены:\n"
+        if countries:
+            for region, price in countries:
+                message += f"{region}: {price}\n"
+            await bot.edit_message_text(message, call.message.chat.id, call.message.message_id,
+                                        reply_markup=adm_kb.adm_add_geo)
+        else:
+            await bot.edit_message_text('Тут должен быть список гео, но пока гео нет(', call.message.chat.id, call.message.message_id,
+                                        reply_markup=adm_kb.adm_add_geo)
+    elif call.data == 'addnewGEO':
+        async with db.DatabaseBot("DataBase/db.db") as db_bot:
+            countries = await db_bot.get_countries_acc()
+        if countries:
+            message = ('Введите новое гео капсом:\n'
+                       'Существующие:\n')
+            for country in countries:
+                message += f'Название: {country[1]}, Цена: {country[2]}\n'
+        else:
+            message = 'В базе данных нет информации о странах.'
+        await bot.edit_message_text(message,call.message.chat.id,call.message.message_id,reply_markup=adm_kb.adm_menu_geo_back)
+        await states.adm_states.input_new_geo_sum.set()
+
+    elif call.data == 'menuaddaccshop':
+        await bot.edit_message_text('Скиньте файл ( .txt ) с аккаунтами (можно с разными гео)', call.message.chat.id, call.message.message_id,
+                                    reply_markup=adm_kb.cancel_adm_acc_add)
+        await states.adm_states.get_shop_acc.set()
+
+    elif call.data.startswith('AccBuy_'):
+        await bot.edit_message_text('Введите кол-во аккаунтов',call.message.chat.id,call.message.message_id,reply_markup=adm_kb.cancel_adm_kb)
+        geo = call.data.split('_')[1]
+        price = call.data.split('_')[2]
+        await states.user_states.new_acc_buy.set()
+        state = Dispatcher.get_current().current_state()
+        await state.update_data(geo=geo)
+        await state.update_data(price=price)
+
+
+@dp.message_handler(content_types=types.ContentType.DOCUMENT, state=states.adm_states.get_shop_acc)
+async def handle_docs(message: types.Message, state: FSMContext):
+    document = message.document
+    if document.mime_type == 'text/plain':
+        file_info = await bot.get_file(document.file_id)
+        downloaded_file = await bot.download_file(file_info.file_path)
+        file_content = downloaded_file.read().decode('utf-8')
+        lines = file_content.splitlines()
+        non_empty_lines = [line for line in lines if line.strip() != ""]
+        filtered_content = "\n".join(non_empty_lines)
+        with open('accounts.txt', 'a') as accounts_file:
+            accounts_file.write(filtered_content + '\n')
+        file_path = f'temp_{document.file_name}'
+        with open(file_path, 'wb') as temp_file:
+            temp_file.write(downloaded_file.getvalue())
+        os.remove(file_path)
+        await message.reply("Файл обработан и его содержимое добавлено в accounts.txt.")
+        await state.finish()
+    else:
+        await message.reply("Пожалуйста, пришлите текстовый файл (формат .txt).")
+
+
+@dp.message_handler(state=states.adm_states.input_new_geo_sum)
+async def adm_states_input_geo_sum(message:types.Message,state = FSMContext):
+    input_geo_sums = message.text
+    await state.update_data(sub_id=input_geo_sums)
+    await bot.send_message(message.chat.id, text='Введите цену в $', reply_markup=adm_kb.adm_menu_geo_back)
+    await states.adm_states.new_input_new_geo_sum.set()
+
+@dp.message_handler(state=states.adm_states.new_input_new_geo_sum)
+async def adm_states_new_input_new_geo_sum(message: types.Message, state: FSMContext):
+    money = message.text
+    data = await state.get_data()
+    await state.finish()
+    sum_id = data['sub_id']
+    async with db.DatabaseBot("DataBase/db.db") as db_bot:
+        await db_bot.add_geo_acc(sum_id, float(money))
+           # await db_bot.commit()
+    await bot.send_message(message.chat.id, text='Гео добавлено\n')
+    await bot.send_message(message.chat.id, text='Админ панель', reply_markup=adm_kb.adm_menu)
 
 @dp.callback_query_handler(state=states.user_states.proxy)
 async def user_states_accounts(call: CallbackQuery, state=FSMContext):

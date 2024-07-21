@@ -113,6 +113,18 @@ class DatabaseBot:
                 ''', (user_id, date_reg, arg, 0,))
                 await self.db.commit()
 
+    async def add_geo_acc(self, user_id, final_balance):
+        async with self.lock:
+            await self.db.execute('INSERT OR IGNORE INTO countries (region, price ) VALUES (?, ?)',
+                                          (user_id, final_balance))
+            await self.db.commit()
+
+    async def get_countries_acc(self):
+        async with self.lock:
+            async with self.db.execute('SELECT region, price FROM countries') as cursor:
+                rows = await cursor.fetchall()
+        return rows
+
 async def main():
     database_bot = DatabaseBot("Database/db.db")
     await database_bot.initialize_db()
