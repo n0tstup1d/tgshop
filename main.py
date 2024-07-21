@@ -148,6 +148,10 @@ async def call(call: CallbackQuery):
                                     call.message.chat.id, call.message.message_id,
                                     reply_markup=adm_kb.cancel_adm_give_sum)
         await states.adm_states.get_sum_id.set()
+    elif call.data == 'shopaccadd':
+        await bot.edit_message_text('Список существующих стран в магазине и их список:\n',
+                                    call.message.chat.id, call.message.message_id,
+                                    reply_markup=adm_kb.cancel_adm_give_sum)
 
 @dp.callback_query_handler(state=states.user_states.proxy)
 async def user_states_accounts(call: CallbackQuery, state=FSMContext):
