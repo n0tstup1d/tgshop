@@ -62,13 +62,24 @@ forum = Forum(token=token_lolz, language="ru")
 
 @dp.message_handler(commands=['start'])
 async def start(message: types.Message):
-    await bot.send_message(message.chat.id, text='Добро пожаловать в магазин TikTokShop!'
-                                                 '\nЗдесь вы можете приобрести аккаунты с определённым гео(изменить желательно)', reply_markup=user_kb.main_menu)
+    arg = message.get_args()
+    print(arg)
+    await commands.set_default_commands(bot)
+    async with db.DatabaseBot("Database/db.db") as db_bot:
+        rez = await db_bot.check_users_start(message.from_user.id)
+    if rez:
+        pass
+    else:
+        current_date = date.today()
+        async with db.DatabaseBot("Database/db.db") as db_bot:
+            await db_bot.insert_user(message.from_user.id, current_date, arg)
+    await bot.send_message(message.chat.id, text='Добро пожаловать', reply_markup=user_kb.main_menu)
+
 
 @dp.message_handler(commands=['adm'])
 async def adm(message:types.Message):
     if message.from_user.id in config.id_adm:
-        await bot.send_message(message.chat.id,text = 'Добро пожаловать')#reply_markup=adm_kb.adm_menu
+        await bot.send_message(message.chat.id,text = 'Добро пожаловать в админ панель')#reply_markup=adm_kb.adm_menu
 
 
 @dp.message_handler(content_types=['text'])
@@ -96,15 +107,15 @@ async def text(message:types.Message):
                                                 "Если возникли проблемы с товаром магазина, писать админу"
                                                 "Связь с администратором: None\n")
     if message.text == "💌 Получить код с почты":
-        await bot.send_message(message.chat.id,
-                                                "Введите вашу почту", reply_markup=user_kb.main_menu)
-
+        await bot.send_message(message.chat.id,"Введите вашу почту", reply_markup=await user_kb.mail_back_kb())
+        await states.user_states.for_maill.set()
 @dp.callback_query_handler(state=states.user_states.proxy)
 async def user_states_accounts(call: CallbackQuery, state=FSMContext):
         await state.finish()
-        if call.data == 'cancel':
-            await bot.edit_message_text( call.message.chat.id, call.message.message_id,
+        if call.data == 'cancel_mail':
+            await bot.edit_message_text('Введите id пользователя', call.message.chat.id, call.message.message_id,
                                         reply_markup=user_kb.main_menu)
+
 
 if __name__ == "__main__":
     executor.start_polling(dp,skip_updates=True)

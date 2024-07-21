@@ -18,6 +18,9 @@ main_menu.add(w,r)
 main_menu.add(e,y)
 main_menu.add(it,t)
 
-pass_mail_kb = InlineKeyboardMarkup(row_width=1)
-w = InlineKeyboardButton(text = 'Назад',callback_data='cancel')
-pass_mail_kb .add(w)
+
+async def mail_back_kb():
+    kb = InlineKeyboardMarkup(row_width=1)
+    w = InlineKeyboardButton(text='Назад', callback_data='cancel_mail')
+    kb.add(w)
+    return kb
