@@ -5,7 +5,9 @@ bot_token = '7368128607:AAEAEWh68Vu1KIG2EKYMEXxBwfYQ8VkXCrE'
 
 id_adm = [5116994352,646534367,6712419902,6864888389,6712419902,7322876281,2069495261,646534367]
 
-crypto_token = '188895:AAx0aYNuVszHcljizjBwciK8k3sxWOLfRfY'
+crypto_token = '241651:AAV5LTi9Z478MgSrw89Y07rVSHmkJ4agsW0'
+#Это для теста ↑
+#crypto_token = '188895:AAx0aYNuVszHcljizjBwciK8k3sxWOLfRfY'
 
 payment_channel = 5116994352
 

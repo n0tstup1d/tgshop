@@ -31,6 +31,9 @@ cancel_adm_give_sum = InlineKeyboardMarkup(row_width=1)
 t = InlineKeyboardButton(text = 'Назад',callback_data='back_in_geo')
 cancel_adm_give_sum.add(t)
 
+cancel_adm_kb = InlineKeyboardMarkup(row_width=1)
+q = InlineKeyboardButton(text = 'Назад',callback_data='back')
+cancel_adm_kb.add(q)
 
 adm_add_geo = InlineKeyboardMarkup(row_width=1)
 w = InlineKeyboardButton(text=f'Добавить новый гео', callback_data=f'addnewGEO')

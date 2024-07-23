@@ -22,7 +22,47 @@ y = InlineKeyboardButton(text = '🖤 Tik Tok Checker', callback_data='tiktokche
 # r = KeyboardButton(text = 'Купить номер')
 t = InlineKeyboardButton(text = 'Назад', callback_data='backsub')
 main_menu_sub.add(e,y)
-main_menu_sub.add(t)
+cart_acc_menu = InlineKeyboardMarkup(row_width=2)
+e = InlineKeyboardButton(text = 'Оплатить💸', callback_data='paycart')
+y = InlineKeyboardButton(text = 'Очистить корзину❌', callback_data='clearcart')
+# r = KeyboardButton(text = 'Купить номер')
+t = InlineKeyboardButton(text = 'Назад', callback_data='back')
+cart_acc_menu.add(e,y)
+cart_acc_menu.add(t)
+
+kb_cart_shop = InlineKeyboardMarkup(row_width=1)
+w = InlineKeyboardButton(text='Перейти к покупкам', callback_data='show_shop')
+kb_cart_shop.add(w)
+balance_kb = InlineKeyboardMarkup(row_width=1)
+q = InlineKeyboardButton(text = 'Пополнить баланс',callback_data='balance_add')
+w = InlineKeyboardButton(text = 'Закрыть',callback_data='close')
+balance_kb.add(q,w)
+
+balance_kb = InlineKeyboardMarkup(row_width=1)
+q = InlineKeyboardButton(text = 'Пополнить баланс',callback_data='balance_add')
+w = InlineKeyboardButton(text = 'Закрыть',callback_data='close')
+balance_kb.add(q,w)
+
+
+async def profile_payments_kb(sum, com):
+    kb = InlineKeyboardMarkup(row_width=2)
+    qw = InlineKeyboardButton(text='💚 LOLZ', callback_data=f'lolzpay_{sum}_{com}')
+    q = InlineKeyboardButton(text = '🪙 USDT (CryptoBot)', callback_data=f'profile_pay_USDT_{sum}')
+    w = InlineKeyboardButton(text = '⛏️ TRX (CryptoBot)', callback_data=f'profile_pay_TRX_{sum}')
+    r = InlineKeyboardButton(text = '🔷 TON (CryptoBot)', callback_data=f'profile_pay_TON_{sum}')
+    t = InlineKeyboardButton(text = 'Назад',callback_data='balance_add')
+    kb.add(qw,q, w, r, t)
+    return kb
+
+
+async def shop_acc_kb(region, price, count):
+    kb = InlineKeyboardMarkup(row_width=2)
+    r = InlineKeyboardButton(text='Добавить в корзину 🛒', callback_data=f'additemincart_{region}_{price}_{count}')
+    q = InlineKeyboardButton(text='Оплатить 💸', callback_data=f'buy_{region}_{price}_{count}')
+    w = InlineKeyboardButton(text='Назад', callback_data='cancel_mail')
+    kb.add(q,r)
+    kb.add(w)
+    return  kb
 async def mail_back_kb():
     kb = InlineKeyboardMarkup(row_width=1)
     w = InlineKeyboardButton(text='Назад', callback_data='cancel_mail')
@@ -48,7 +88,7 @@ async def shop_menu_acc():
         if country in country_rr_map:
             rr = country_rr_map[country]
             print(country)
-            q = InlineKeyboardButton(text=f'{country} | {count} шт.| {rr} $', callback_data=f'AccBuy_{country}_{rr}{country}_{rr}')
+            q = InlineKeyboardButton(text=f'{country} | {count} шт.| {rr} ₽', callback_data=f'AccBuy_{country}_{rr}')
             kb.add(q)
 
     w = InlineKeyboardButton(text='Закрыть', callback_data='close')

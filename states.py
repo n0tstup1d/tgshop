@@ -9,6 +9,7 @@ class adm_states(StatesGroup):
 
 class user_states(StatesGroup):
     for_maill = State()
-
+    new_balance = State()
     proxy = State()
     new_acc_buy = State()
+    cart_acc_for_buy = State()

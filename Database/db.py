@@ -50,14 +50,26 @@ class DatabaseBot:
                 ''')
             if 'users' not in existing_tables:
                 await self.db.execute('''
-                    CREATE TABLE "users" (
-                    "id_users"	INTEGER,
-	                "data_reg"	TEXT,
-	                "sub_date"	TEXT,
-	                "balance"	FLOAT,
-	                PRIMARY KEY("id_users" AUTOINCREMENT)
+                        CREATE TABLE "users" (
+                        "id_users"	INTEGER,
+                        "data_reg"	TEXT,
+                        "sub_date"	TEXT,
+                        "balance"	FLOAT,
+                        PRIMARY KEY("id_users" AUTOINCREMENT)
                     )
                 ''')
+            if 'cart' not in existing_tables:
+                await self.db.execute('''
+                            CREATE TABLE IF NOT EXISTS cart (
+                                id_cart	INTEGER,
+                                user_id	INTEGER,
+                                item	TEXT,
+                                count_item	INTEGER,
+                                price_cart	FLOAT,
+                                added_at	TIMESTAMP,
+                                PRIMARY KEY("id_cart" AUTOINCREMENT)
+                            )
+                        ''')
 
             await self.db.commit()
 
@@ -105,7 +117,6 @@ class DatabaseBot:
                 return res
 
     async def insert_user(self, user_id, date_reg, arg):
-
             async with self.lock:
                 await self.db.execute('''
                     INSERT OR IGNORE INTO users (user_id, data_reg, sub_date, balance)
@@ -119,11 +130,70 @@ class DatabaseBot:
                                           (user_id, final_balance))
             await self.db.commit()
 
-    async def get_countries_acc(self):
+    '''async def add_cart_acc(self, geo, price, count):
         async with self.lock:
-            async with self.db.execute('SELECT region, price FROM countries') as cursor:
+            await self.db.execute('INSERT OR IGNORE INTO cart (region, price ) VALUES (?, ?)',(user_id, final_balance))
+            await self.db.commit()'''
+
+    async def add_item(self, user_id, region,item, price, count_item):
+        async with self.lock:
+            await self.db.execute('''
+                INSERT INTO cart (user_id, region, item, count_item, price_cart, added_at) VALUES (?, ?, ?, ?, ?,CURRENT_TIMESTAMP)
+            ''', (user_id, region,item, count_item, price,))
+            await self.db.commit()
+
+    async def get_items(self, user_id):
+        async with self.lock:
+            async with self.db.execute('''
+                SELECT count_item, region, price_cart FROM cart WHERE user_id = ?
+            ''', (user_id,)) as cursor:
                 rows = await cursor.fetchall()
         return rows
+
+    async def delete_old_items(self):
+        async with self.lock:
+            await self.db.execute('''DELETE FROM cart WHERE added_at < datetime('now', '-30 minutes')''')
+            await self.db.commit()
+
+    async def get_id_cart(self, user_id):
+        async with self.lock:
+            async with self.db.execute('''
+                SELECT id_cart FROM cart WHERE user_id = ?
+            ''', (user_id,)) as cursor:
+                rows = await cursor.fetchall()
+        return rows
+
+    async def update_balance_user_plus(self, user_id, money):
+        async with self.lock:
+            await self.db.execute('UPDATE users SET balance = ? WHERE user_id = ?', (float(money), user_id,))
+            await self.db.commit()
+
+    async def delete_item(self, user_id):
+        async with self.lock:
+            await self.db.execute('DELETE FROM cart WHERE user_id = ?', (user_id,))
+            await self.db.commit()
+
+    async def insert_purchase(self, sum_purchase: int):
+        date_purchase = datetime.now().strftime('%Y-%m-%d %H:%M')  # Форматирование даты до минуты
+        async with self.lock:
+            await self.db.execute('''
+                INSERT INTO purchase (date_purchase, sum_purchase)
+                VALUES (?, ?)
+            ''', (date_purchase, sum_purchase))
+            await self.db.commit()
+
+    async def get_user_info(self, user_id):
+        async with self.lock:
+            async with self.db.execute('SELECT * FROM users WHERE user_id = ?', (user_id,)) as cursor:
+                res = await cursor.fetchone()
+                return res
+
+    async def get_countries_acc(self):
+            async with self.lock:
+                async with self.db.execute('SELECT region, price FROM countries') as cursor:
+                    rows = await cursor.fetchall()
+            return rows
+
 
 async def main():
     database_bot = DatabaseBot("Database/db.db")
