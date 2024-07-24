@@ -52,10 +52,15 @@ def random_string(length):
 async def delete_old_items_periodically():
     while True:
         async with db.DatabaseBot("Database/db.db") as db_bot:
+            old_items = await db_bot.get_old_items()
+            print(old_items)
+            with open('accounts_del.txt', 'a') as file:
+                for item in old_items:
+                    file.write(f"{item}\n")
             await db_bot.delete_old_items()
+
         print(f"Очистка корзины в {datetime.today()}")
         await asyncio.sleep(120)  # Ожидаем 30 минут
-
 
 def extract_accounts(country_code, count):
     tag = count
@@ -151,17 +156,16 @@ async def text(message:types.Message):
     if message.text == "👤 Профиль":
         async with db.DatabaseBot("Database/db.db") as db_bot:
             user_info = await db_bot.get_user_bal(message.chat.id)
-        await bot.send_message(message.chat.id, f"Ваш ID: `{message.chat.id}`\n"
-                                                f"\n"
-                                                f"Баланс: {user_info[4]}₽\n"
+        await bot.send_message(message.chat.id, f"👤 Ваш ID: `{message.chat.id}`\n\n"
+                                                f"💕 Купленных акаунтов: {user_info}"
                                                 #f"\n"
                                                # f"Куплено аккаунтов: бд нет\n"
                                                 #f"Может сделать на все товары как написанно выше "
-                                                , reply_markup=user_kb.balance_kb, parse_mode='Markdown')
+                                                , parse_mode='Markdown')
     if message.text == "🛒 Магазин":
         '''async with db.DatabaseBot("Database/bd.db") as db_bot:
             res = await db_bot.get_accont()'''
-        await bot.send_message(message.chat.id, f"--------------- В наличии ---------------\n",
+        await bot.send_message(message.chat.id, f"---------------- В наличии ----------------\n",
                                                 reply_markup=await user_kb.shop_menu_acc())
 
         print()
@@ -182,7 +186,7 @@ async def text(message:types.Message):
             id_cart = await db_bot.get_id_cart(message.from_user.id)
         async with db.DatabaseBot("Database/db.db") as db_bot:
             items = await db_bot.get_items(message.from_user.id)
-        print(items)
+        print(f"{items}\n↑ items")
         total_amount = 0.0
         # Итерация по каждому кортежу
         for item in items:
@@ -191,13 +195,14 @@ async def text(message:types.Message):
             total_amount += amount
 
         # Печать суммы всех amount
-        print("Total Amount:", total_amount)
         response_text = ""
         if items:
             total_amount = 0
             # Извлечение значения
-            response_text = (f"Номер вашего чека: `{str(id_cart[0][0])}`\n\n"
-                             f"Чек:\n")
+            number_check = str(id_cart[0][0])
+            user_id = message.chat.id
+            response_text = (f"Номер вашего заказа: `{str(id_cart[0][0])}`\n\n"
+                             f"Заказ:\n")
             for item in items:
                 id_value, country, amount = item
                 #print(f"Обработанный элемент: Количество={id_value}, Страна={country}, Сумма={amount}, Текущая общая сумма={total_amount}")
@@ -206,7 +211,7 @@ async def text(message:types.Message):
 
             response_text += f"\nСумма к оплате: {total_amount} ₽ "
 
-            await message.answer(response_text, parse_mode='Markdown', reply_markup=user_kb.cart_acc_menu)
+            await message.answer(response_text, parse_mode='Markdown', reply_markup=await user_kb.cart_pay(total_amount, number_check, user_id))
         else:
             await bot.send_message(message.chat.id, "🛒 Корзина пуста", reply_markup=user_kb.kb_cart_shop)
         '''await bot.send_message(message.chat.id,"Введите вашу почту", reply_markup=await user_kb.mail_back_kb())
@@ -219,13 +224,14 @@ async def text(message:types.Message):
         today = datetime.today()
         formatted_date = today.strftime('%Y-%m-%d')
         if rez < formatted_date:
-            await bot.send_message(message.chat.id,
-                                                "__У вас отсутвует подписка__ 😕\n"
-                                                "\n"
-                                                "При покупки подписки вы получаете:\n\n"
-                                                "♦ Тик Ток Чекер 🖤\n"
-                                                "♦ Получение кодов от почты 💌\n"
-                                                "♦ Уникализатор видео и фото 🖼",  parse_mode=ParseMode.MARKDOWN_V2 ,reply_markup=await user_kb.mail_back_kb())
+            await bot.send_message(message.chat.id,"🛠 В разработке 🛠"
+                                                #"__У вас отсутвует подписка__ 😕\n"
+                                                #"\n"
+                                                #"При покупки подписки вы получаете:\n\n"
+                                                #"♦ Тик Ток Чекер 🖤\n"
+                                                #"♦ Получение кодов от почты 💌\n"
+                                                #"♦ Уникализатор видео и фото 🖼"
+                                   ,  parse_mode=ParseMode.MARKDOWN_V2 ,reply_markup=await user_kb.mail_back_kb())
         else:
             async with db.DatabaseBot("Database/db.db") as db_bot:
                 mon = await db_bot.check_users_mon(message.from_user.id)
@@ -262,10 +268,10 @@ async def call(call: CallbackQuery):
     elif call.data == 'SettingsGeo':
         async with db.DatabaseBot("Database/db.db") as db_bot:
             countries = await db_bot.get_countries_acc()
-        message = "Список регионов и их цены:\n"
+        message = "Список гео:\n"
         if countries:
-            for region, price in countries:
-                message += f"{region}: {price}\n"
+            for region, price, names in countries:
+                message += f"Название {str(names)}: Регион {region}: Стоимость {price} ₽\n"
             await bot.edit_message_text(message, call.message.chat.id, call.message.message_id,
                                         reply_markup=adm_kb.adm_add_geo)
         else:
@@ -279,31 +285,94 @@ async def call(call: CallbackQuery):
         if countries:
             message = ('Введите новое гео капсом:\n'
                        'Существующие:\n')
-            for country in countries:
-                message += f'Название: {country[1]}, Цена: {country[2]} ₽\n'
+            for region, price, names in countries:
+                message += f"Название {str(names)}: Регион {region}: Стоимость {price} ₽\n"
+            await bot.edit_message_text(message, call.message.chat.id, call.message.message_id,
+                                        reply_markup=adm_kb.adm_add_geo)
         else:
             message = 'В базе данных нет информации о странах.'
         await bot.edit_message_text(message,call.message.chat.id,call.message.message_id,reply_markup=adm_kb.adm_menu_geo_back)
         await states.adm_states.input_new_geo_sum.set()
 
+    elif call.data == 'delGEO':
+        async with db.DatabaseBot("Database/db.db") as db_bot:
+            countries = await db_bot.get_countries_acc()
+        if countries:
+            message = ('Введите гео которое хотите удалит:\n'
+                       'Существующие:\n')
+            for region, price, names in countries:
+                message += f"Название {str(names)}: Регион {region}: Стоимость {price} ₽\n"
+            await bot.edit_message_text(message, call.message.chat.id, call.message.message_id,
+                                        reply_markup=adm_kb.adm_add_geo)
+        else:
+            message = 'В базе данных нет информации о странах.'
+        await bot.edit_message_text(message,call.message.chat.id,call.message.message_id,reply_markup=adm_kb.adm_menu_geo_back)
+        await states.adm_states.input_del_geo_sum.set()
+
+    elif call.data == 'back_adm_panel':
+        await bot.send_message(call.message.chat.id, text='Админ панель', reply_markup=adm_kb.adm_menu)
+
+    elif call.data == 'back':
+        await bot.edit_message_text('Выберите нужные настройки', call.message.chat.id, call.message.message_id,
+                                reply_markup=adm_kb.adm_menu)
+
+    elif call.data == 'mailing':
+        await bot.edit_message_text('Отправьте сообщение для рассылки', call.message.chat.id, call.message.message_id,
+                                    reply_markup=adm_kb.cancel_adm_kb)
+        await states.adm_states.mailing.set()
+
+    elif call.data == 'editGEO':
+        async with db.DatabaseBot("Database/db.db") as db_bot:
+            countries = await db_bot.get_countries_acc()
+        if countries:
+            message = ('Введите гео капсом которое хотите отредактировать:\n'
+                       'Существующие:\n')
+            for country in countries:
+                message += f'Название: {country[0]}, Цена: {country[1]} ₽\n'
+        else:
+            message = 'В базе данных нет информации о странах.'
+        await bot.edit_message_text(message,call.message.chat.id,call.message.message_id,reply_markup=adm_kb.adm_menu_geo_back)
+        await states.adm_states.input_new_geo_sum_for_edit.set()
+
+
     elif call.data == 'menuaddaccshop':
-        await bot.edit_message_text('Скиньте файл ( .txt ) с аккаунтами (можно с разными гео)', call.message.chat.id, call.message.message_id,
-                                    reply_markup=adm_kb.cancel_adm_acc_add)
+        await bot.edit_message_text('Скиньте файл (.txt) с аккаунтами (можно с разными гео)', call.message.chat.id, call.message.message_id ,reply_markup=adm_kb.adm_menu_geo_back)
         await states.adm_states.get_shop_acc.set()
 
     elif call.data == 'balance_add':
         await bot.edit_message_text('Введите сумму для пополнения в ₽',call.message.chat.id,call.message.message_id,reply_markup=adm_kb.cancel_adm_kb)
         await states.user_states.new_balance.set()
 
-    elif call.data.startswith('AccBuy_'):
-        await bot.edit_message_text('Введите кол-во аккаунтов',call.message.chat.id,call.message.message_id,reply_markup=user_kb.kb_shop_back)
+    elif call.data.startswith('accbuy_'):
         geo = call.data.split('_')[1]
         price = call.data.split('_')[2]
-        await states.user_states.new_acc_buy.set()
+        '''async with db.DatabaseBot("Database/db.db") as db_bot:
+            count_geo = await db_bot.get_count_geo(geo)'''
+        ''' message = f"Регион: {geo}\n ⬇️⬇️Доступно к покупке⬇️⬇️\n \nВсего: {count_geo} шт.\n"'''
+        async with db.DatabaseBot("Database/db.db") as db_bot:
+            counts = await db_bot.get__geo(geo)
+        message = (
+            f"Регион: {geo}\n ⬇️⬇️Доступно к покупке⬇️⬇️\n \n"
+            f"1️⃣ - Отлежка меньше 4ч: {counts['less_4h']} шт.\n"
+            f"2️⃣ - Отлежка больше 4ч: {counts['more_4h']} шт.\n"
+            f"3️⃣ - Отлежка больше 12ч: {counts['more_12h']} шт.\n"
+            f"4️⃣ - Отлежка больше 24ч: {counts['more_24h']} шт.\n"
+            f"5️⃣ - Отлежка больше 36ч: {counts['more_36h']} шт.\n"
+        )
+        await bot.edit_message_text(message, call.message.chat.id, call.message.message_id,
+                                    reply_markup=await user_kb.time_otlega(geo, price))
+        '''await states.user_states.new_acc_buy.set()
         state = Dispatcher.get_current().current_state()
         await state.update_data(geo=geo)
-        await state.update_data(price=price)
+        await state.update_data(price=price)'''
 
+
+
+
+
+        '''await bot.edit_message_text('Введите кол-во аккаунтов',call.message.chat.id,call.message.message_id,reply_markup=user_kb.kb_shop_back)
+        
+        '''
     elif call.data.startswith('clearcart'):
         item = call.message.get_args()
         print(call.message.chat.id)
@@ -311,19 +380,20 @@ async def call(call: CallbackQuery):
             await db_bot.delete_item(call.message.chat.id)
         await call.message.reply(f"Корзина очищена ❌")
     elif call.data.startswith('show_shop'):
-        await bot.send_message(call.message.chat.id, f"---------------- В наличии ----------------\n",
+        await bot.edit_message_text(f"---------------- В наличии ----------------\n",call.message.chat.id, call.message.message_id,
                                reply_markup=await user_kb.shop_menu_acc())
 
-    elif call.data.startswith('lolzpay_'):
-
+    elif call.data.startswith('lolzbuy_'):
         suma = call.data.split('_')[1]
-        rubles = int(suma)
+        rubles = float(suma)
         com = call.data.split('_')[2]
         print(com)
+        num_check = call.data.split('_')[3]
+        user_id = call.data.split('_')[4]
         url_lolz=str(market.payments.generate_link(username='notstupid', user_id='7591946', comment=com, currency=Constants.Market.Currency.rub, amount=rubles))
         kb = InlineKeyboardMarkup(row_width=1)
         q = InlineKeyboardButton(text='Перейти к оплате', url=url_lolz)
-        qq = InlineKeyboardButton(text='Проверить оплату', callback_data=f'check_lolzpay_{rubles}_{com}_{suma}')
+        qq = InlineKeyboardButton(text='Проверить оплату', callback_data=f'check_lolzbuy_{rubles}_{com}_{num_check}_{user_id}')
         w = InlineKeyboardButton(text='Отменить', callback_data=f'cancel_order')
         kb.add(q,qq,w)
         await bot.edit_message_text(f'🆙 Пополнение баланса\n'
@@ -338,10 +408,11 @@ async def call(call: CallbackQuery):
                                     call.message.chat.id, call.message.message_id, reply_markup=kb)
     elif call.data == 'cancel_order':
         await bot.delete_message(call.message.chat.id, call.message.message_id)
-    elif call.data.startswith('check_lolzpay_'):
+    elif call.data.startswith('check_lolzbuy_'): #check_lolzbuy_{rubles}_{com}_{num_check}_{user_id}
         amount = call.data.split('_')[2]
         comment = call.data.split('_')[3]
-        summa = call.data.split('_')[4]
+        number_check = call.data.split('_')[4]
+        user_id = call.data.split('_')[5]
         print(amount)
         print(comment)
         result = await CheckPayment(market, amount=amount,comment=comment, include_payment_data=True)
@@ -352,18 +423,42 @@ async def call(call: CallbackQuery):
         print("Payment data: " + str(result.payment_data))
         print("Parameters: " + str(result.parameters))
         if str(result.status_code) == '1':
-            await bot.edit_message_text(f'Оплата прошла успешно, деньги зачислены на баланс',
+            await bot.edit_message_text(f'Оплата прошла успешно. Идёт отправка...',
                                         call.message.chat.id, call.message.message_id)
+            print(call.from_user.id)
+            # async with db.DatabaseBot("Database/db.db") as db_bot:
+            #    await db_bot.update_balance_user_plus(call.message.chat.id)
             async with db.DatabaseBot("Database/db.db") as db_bot:
-                res = await db_bot.get_user_info(call.from_user.id)
-            summa_fin = float(res[4]) + float(summa)
+                items = await db_bot.get_item(call.message.chat.id)
+            strc = ""
+            for idx, item in enumerate(items):
+                it = item[0]
+                cleaned_string = it.strip("[]'")
+                cleaned_string = cleaned_string.replace("\\n", "\n").replace("', '", "\n")
+                cleaned_string = "\n".join([line.strip() for line in cleaned_string.splitlines() if line.strip()])
+                rand = random.randint(1, 999999999999999)
+                file_path = f"Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt"
+                with open(file_path, "w") as file:
+                    file.write(cleaned_string)
+
+                await bot.send_document(call.message.chat.id,
+                                        open(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt', 'rb'))
+                strc += cleaned_string
+                try:
+                    os.remove(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt')
+                except:
+                    pass
             async with db.DatabaseBot("Database/db.db") as db_bot:
-                await db_bot.update_balance_user_plus(call.message.chat.id, summa_fin)
+                itemss = await db_bot.sum_count_acc(call.message.chat.id)
             async with db.DatabaseBot("Database/db.db") as db_bot:
-                await db_bot.insert_purchase(float(summa))
-            await bot.send_message(call.message.chat.id,
-                                   text=f'Дата окончания подписки: {res[3]}\nДата регистрации: {res[2]}\n\nБаланс: {res[4]} ₽',
-                                   reply_markup=user_kb.balance_kb)
+                res = await db_bot.get_user_bal(call.from_user.id)
+            finall_count = int(itemss) + int(res)
+            async with db.DatabaseBot("Database/db.db") as db_bot:
+                await db_bot.update_balance_user(call.message.chat.id, finall_count)
+            async with db.DatabaseBot("Database/db.db") as db_bot:
+                await db_bot.insert_check(float(amount), number_check, user_id, strc)
+            async with db.DatabaseBot("Database/db.db") as db_bot:
+                await db_bot.delete_item(user_id)
 
         elif str(result.status_code) == '0':
             print(0)
@@ -378,17 +473,61 @@ async def call(call: CallbackQuery):
                 await bot.edit_message_text(f'Оплата прошла успешно, деньги зачислены на баланс ✔',
                                             call.message.chat.id, call.message.message_id, reply_markup=user_kb.main_menu)
                 async with db.DatabaseBot("Database/db.db") as db_bot:
-                    res = await db_bot.get_user_info(call.from_user.id)
-                mon = float(res[4]) + float(amount)
+                    res = await db_bot.get_user_bal(call.from_user.id)
+                mon = int(res) + int(amount)
                 print(mon)
                 print(call.from_user.id)
                 async with db.DatabaseBot("Database/db.db") as db_bot:
-                    await db_bot.update_balance_user_plus(call.message.chat.id, mon)
-                await bot.send_message(call.message.chat.id,text = f"Ваш ID: `{call.message.chat.id}`\n"
-                                                f"\n"
-                                                f"Баланс: {mon}₽\n",reply_markup=user_kb.balance_kb, parse_mode='Markdown')
+                    await db_bot.update_balance_user(call.message.chat.id, mon)
                 async with db.DatabaseBot("Database/db.db") as db_bot:
                     await db_bot.insert_purchase(int(amount))
+        except Exception as e:
+            print(traceback.format_exc())
+
+    elif call.data.startswith('prcheck_buy_'): #prcheck_buy_{rez_pay[1]}_{sum}_{number_check}_{user_id}
+        try:
+            id_pay = call.data.split('_')[2]
+            amount = call.data.split('_')[3]
+            number_check = call.data.split('_')[4]
+            user_id = call.data.split('_')[5]
+            status = await cryptobot.check_status(amount,id_pay)
+            if status == 'paid':
+                await bot.edit_message_text(f'Оплата прошла успешно. Идёт отправка...',
+                                            call.message.chat.id, call.message.message_id)
+                print(call.from_user.id)
+                #async with db.DatabaseBot("Database/db.db") as db_bot:
+                #    await db_bot.update_balance_user_plus(call.message.chat.id)
+                async with db.DatabaseBot("Database/db.db") as db_bot:
+                    items = await db_bot.get_item(call.message.chat.id)
+                strc = ""
+                for idx, item in enumerate(items):
+                    it = item[0]
+                    cleaned_string = it.strip("[]'")
+                    cleaned_string = cleaned_string.replace("\\n", "\n").replace("', '", "\n")
+                    cleaned_string = "\n".join([line.strip() for line in cleaned_string.splitlines() if line.strip()])
+                    rand = random.randint(1, 999999999999999)
+                    file_path = f"Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt"
+                    with open(file_path, "w") as file:
+                        file.write(cleaned_string)
+
+                    await bot.send_document(call.message.chat.id, open(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt', 'rb'))
+                    strc += cleaned_string
+                    try:
+                        os.remove(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt')
+                    except:
+                        pass
+                async with db.DatabaseBot("Database/db.db") as db_bot:
+                    itemss = await db_bot.sum_count_acc(call.message.chat.id)
+                async with db.DatabaseBot("Database/db.db") as db_bot:
+                    res = await db_bot.get_user_bal(call.from_user.id)
+                finall_count = int(itemss) + int(res)
+                async with db.DatabaseBot("Database/db.db") as db_bot:
+                    await db_bot.update_balance_user(call.message.chat.id, finall_count)
+                async with db.DatabaseBot("Database/db.db") as db_bot:
+                    await db_bot.insert_check(float(amount), number_check, user_id, strc)
+                async with db.DatabaseBot("Database/db.db") as db_bot:
+                    await db_bot.delete_item(user_id)
+
         except Exception as e:
             print(traceback.format_exc())
 
@@ -401,13 +540,36 @@ async def call(call: CallbackQuery):
         qq = InlineKeyboardButton(text='Проверить оплату', callback_data=f'prcheck_pay_{rez_pay[1]}_{sum}')
         w = InlineKeyboardButton(text='Отменить', callback_data=f'prof_cancel_order')
         kb.add(q, qq, w)
-        await bot.edit_message_text(f'🆙 Пополнение\n➖➖➖➖➖➖➖➖➖➖➖➖➖\n➖➖➖➖➖➖➖➖➖➖➖➖➖\n💰 Сумма пополнения: {sum} ₽',
+        await bot.edit_message_text(f'🆙 Пополнение\n➖➖➖➖➖➖➖➖➖➖➖➖➖\n➖➖➖➖➖➖➖➖➖➖➖➖➖\n💰 Сумма пополнения: {sum} ₽ \n➖➖➖➖➖➖➖➖➖➖➖➖➖\n➖➖➖➖➖➖➖➖➖➖➖➖➖\n ‼️После оплаты, обязательно нажмите проверить оплату‼️ ',
+                                    call.message.chat.id, call.message.message_id, reply_markup=kb)
+
+    elif call.data.startswith('profile_buy_'):
+        type_crypto = call.data.split('_')[2]
+        sum = call.data.split('_')[3]
+        print(float(sum))
+        number_check = call.data.split('_')[4]
+        user_id = call.data.split('_')[5]
+        rez_pay = await cryptobot.order(float(sum), type_crypto)
+        kb = InlineKeyboardMarkup(row_width=1)
+        q = InlineKeyboardButton(text='Перейти к оплате', url=rez_pay[0])
+        qq = InlineKeyboardButton(text='Проверить оплату', callback_data=f'prcheck_buy_{rez_pay[1]}_{sum}_{number_check}_{user_id}')
+        w = InlineKeyboardButton(text='Отменить', callback_data=f'prof_cancel_order')
+        kb.add(q, qq, w)
+        await bot.edit_message_text(f'🆙 Пополнение\n➖➖➖➖➖➖➖➖➖➖➖➖➖\n➖➖➖➖➖➖➖➖➖➖➖➖➖\n💰 Сумма пополнения: {sum} ₽ \n➖➖➖➖➖➖➖➖➖➖➖➖➖\n➖➖➖➖➖➖➖➖➖➖➖➖➖\n ‼️После оплаты, обязательно нажмите проверить оплату‼️',
                                     call.message.chat.id, call.message.message_id, reply_markup=kb)
 
     elif call.data == 'prof_cancel_order':
         await bot.edit_message_text(
             f'Отмена оплаты',
             call.message.chat.id, call.message.message_id, reply_markup=user_kb.balance_kb)
+
+    elif call.data.startswith('bk_'):
+        amount = call.data.split('_')[1]
+        number_check = call.data.split('_')[2]
+        user_id = call.data.split('_')[3]
+        com = random_string(30)
+        print(1)
+        await bot.edit_message_text('Выберите способ оплаты', call.message.chat.id, call.message.message_id, reply_markup=await user_kb.profile_buyments_kb(amount, com, number_check, user_id))
 
 
     elif call.data.startswith('additemincart_'):
@@ -429,10 +591,24 @@ async def call(call: CallbackQuery):
 
         async with db.DatabaseBot("Database/db.db") as db_bot:
                 await db_bot.add_item(call.message.chat.id, geo, str(result), price, count)
-        await bot.send_message(call.message.chat.id,f"Успешно добавлен в вашу корзину. ✔",   reply_markup=user_kb.kb_shop_back)
+        await bot.send_message(call.message.chat.id,f"Успешно добавлен в вашу корзину. ✔",   reply_markup=user_kb.main_menu)
         '''async with db.DatabaseBot("Database/db.db") as db_bot:
             await db_bot.add_cart_acc(geo, price, count)
         '''
+
+@dp.message_handler(state = states.adm_states.mailing)
+async def adm_states_mailing(message:types.Message,state = FSMContext):
+    text = message.text
+    await state.finish()
+    async with db.DatabaseBot("DataBase/db.db") as db_bot:
+        all_users = await db_bot.get_all_users()
+    for user in all_users:
+        try:
+            await bot.send_message(user[1],text = text)
+        except:
+            pass
+    await bot.send_message(message.chat.id,text = 'Рассылка завершена 💌')
+    await bot.send_message(message.chat.id,text = 'Админ панель',reply_markup=adm_kb.adm_menu)
 
 
 @dp.message_handler(state = states.user_states.new_acc_buy)
@@ -481,6 +657,15 @@ async def handle_docs(message: types.Message, state: FSMContext):
         filtered_content = "\n".join(non_empty_lines)
         with open('accounts.txt', 'a') as accounts_file:
             accounts_file.write(filtered_content + '\n')
+        for line in non_empty_lines:
+            print(line)
+            geo_acc = line.split(':')[0]
+            print(geo_acc)
+            async with db.DatabaseBot("DataBase/db.db") as db_bot:
+                await db_bot.insert_account(geo_acc, line)
+            print('Добавили в бд')
+
+
         file_path = f'temp_{document.file_name}'
         with open(file_path, 'wb') as temp_file:
             temp_file.write(downloaded_file.getvalue())
@@ -491,16 +676,46 @@ async def handle_docs(message: types.Message, state: FSMContext):
         await message.reply("Пожалуйста, пришлите текстовый файл (формат .txt).")
 
 
-@dp.message_handler(state=states.adm_states.input_new_geo_sum)
+@dp.message_handler(state=states.adm_states.input_new_geo_sum_for_edit)
 async def adm_states_input_geo_sum(message:types.Message,state = FSMContext):
     input_geo_sums = message.text
     await state.update_data(sub_id=input_geo_sums)
     await bot.send_message(message.chat.id, text='Введите цену в ₽', reply_markup=adm_kb.adm_menu_geo_back)
-    await states.adm_states.new_input_new_geo_sum.set()
+    await states.adm_states.new_input_new_geo_sum_edit.set()
+
+@dp.message_handler(state=states.adm_states.new_input_new_geo_sum_edit)
+async def adm_states_new_input_new_geo_sum(message: types.Message, state: FSMContext):
+    money = message.text
+    data = await state.get_data()
+    await state.finish()
+    sum_id = data['sub_id']
+    async with db.DatabaseBot("DataBase/db.db") as db_bot:
+        user_info = await db_bot.get_countries_sum(str(sum_id))
+    print(str(user_info[1]), str(sum_id))
+    print(float(money))
+    if str(user_info[1]) == str(sum_id):
+        async with db.DatabaseBot("DataBase/db.db") as db_bot:
+            await db_bot.update_geo_acc(sum_id, float(money))
+        # await db_bot.commit()
+        await bot.send_message(message.chat.id, text='Стоимость обновлена.\n')
+    else:
+        await bot.send_message(message.chat.id, text='Стоимость не была обновлена. Ошибка\n')
+    await bot.send_message(message.chat.id, text='Админ панель', reply_markup=adm_kb.adm_menu)
+
 
 @dp.message_handler(state=states.adm_states.new_input_new_geo_sum)
 async def adm_states_new_input_new_geo_sum(message: types.Message, state: FSMContext):
     money = message.text
+    data = await state.get_data()
+    await state.finish()
+    geo = data['sub_id']
+    name = data['sub']
+    async with db.DatabaseBot("Database/db.db") as db_bot:
+        await db_bot.add_geo_acc(geo, name, float(money))
+        # await db_bot.commit()
+    await bot.send_message(message.chat.id, text='Гео добавлено\n')
+    await bot.send_message(message.chat.id, text='Админ панель', reply_markup=adm_kb.adm_menu)
+    '''money = message.text
     data = await state.get_data()
     await state.finish()
     sum_id = data['sub_id']
@@ -509,7 +724,38 @@ async def adm_states_new_input_new_geo_sum(message: types.Message, state: FSMCon
            # await db_bot.commit()
     await bot.send_message(message.chat.id, text='Гео добавлено\n')
     await bot.send_message(message.chat.id, text='Админ панель', reply_markup=adm_kb.adm_menu)
+    '''
 
+
+@dp.message_handler(state=states.adm_states.input_new_geo_sum)
+async def adm_states_input_geo_sum(message:types.Message,state = FSMContext):
+    input_geo_sums_new = message.text
+    await state.finish()
+    await state.update_data(sub_id=input_geo_sums_new)
+    await bot.send_message(message.chat.id, text='Введите название для гео, можно использовать флаги стран', reply_markup=adm_kb.adm_menu_geo_back)
+    await states.adm_states.input_new_geo_sum_new.set()
+
+@dp.message_handler(state=states.adm_states.input_new_geo_sum_new)
+async def adm_states_input_geo_sum(message:types.Message,state = FSMContext):
+    input_geo_sum = message.text
+    await state.update_data(sub=input_geo_sum)
+    await bot.send_message(message.chat.id, text='Введите цену в ₽', reply_markup=adm_kb.adm_menu_geo_back)
+    await states.adm_states.new_input_new_geo_sum.set()
+
+
+'''@dp.message_handler(state=states.adm_states.new_input_new_geo_sum)
+async def adm_states_new_input_new_geo_sum(message: types.Message, state: FSMContext):
+    money = message.text
+    data = await state.get_data()
+    await state.finish()
+    geo = data['sub_id']
+    name = data['sub']
+    async with db.DatabaseBot("Database/db.db") as db_bot:
+        await db_bot.add_geo_acc(geo,name, float(money))
+           # await db_bot.commit()
+    await bot.send_message(message.chat.id, text='Гео добавлено\n')
+    await bot.send_message(message.chat.id, text='Админ панель', reply_markup=adm_kb.adm_menu)
+'''
 @dp.callback_query_handler(state=states.user_states.proxy)
 async def user_states_accounts(call: CallbackQuery, state=FSMContext):
         await state.finish()
@@ -548,6 +794,14 @@ async def adm_states_new_money_days(message:types.Message, state=FSMContext):
 
     async with db.DatabaseBot("Database/db.db") as db_bot:
         await db_bot.delete_old_items()
+
+@dp.message_handler(state=states.adm_states.input_del_geo_sum)
+async def adm_states_input_geo_sum(message:types.Message, state = FSMContext):
+    input_geo_sums = message.text
+    await state.finish()
+    async with db.DatabaseBot("DataBase/db.db") as db_bot:
+        await db_bot.del_geo_acc(input_geo_sums)
+    await bot.send_message(message.chat.id, text='Гео удалено\n')
 
 '''async def delete_old_items_periodically():
     while True:

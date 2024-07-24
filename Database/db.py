@@ -50,11 +50,11 @@ class DatabaseBot:
                 ''')
             if 'users' not in existing_tables:
                 await self.db.execute('''
-                        CREATE TABLE "users" (
-                        "id_users"	INTEGER,
-                        "data_reg"	TEXT,
-                        "sub_date"	TEXT,
-                        "balance"	FLOAT,
+                        CREATE TABLE users (
+                        id_users	INTEGER,
+                        data_reg	TEXT,
+                        sub_date	TEXT,
+                        counts_accounts	TEXT,
                         PRIMARY KEY("id_users" AUTOINCREMENT)
                     )
                 ''')
@@ -112,22 +112,22 @@ class DatabaseBot:
 
     async def get_user_bal(self, user_id):
         async with self.lock:
-            async with self.db.execute('SELECT * FROM users WHERE user_id = ?', (user_id,)) as cursor:
+            async with self.db.execute('SELECT counts_accounts FROM users WHERE user_id = ?', (user_id,)) as cursor:
                 res = await cursor.fetchone()
-                return res
+                return res[0] if res else None
 
     async def insert_user(self, user_id, date_reg, arg):
             async with self.lock:
                 await self.db.execute('''
-                    INSERT OR IGNORE INTO users (user_id, data_reg, sub_date, balance)
+                    INSERT OR IGNORE INTO users (user_id, data_reg, sub_date, counts_accounts)
                     VALUES (?, ?, ?, ?)
-                ''', (user_id, date_reg, arg, 0,))
+                ''', (user_id, date_reg, arg, 0))
                 await self.db.commit()
 
-    async def add_geo_acc(self, user_id, final_balance):
+    async def add_geo_acc(self, user_id, name, final_balance):
         async with self.lock:
-            await self.db.execute('INSERT OR IGNORE INTO countries (region, price ) VALUES (?, ?)',
-                                          (user_id, final_balance))
+            await self.db.execute('INSERT OR IGNORE INTO countries (region, names,price ) VALUES (?, ?, ?)',
+                                          (user_id, name,final_balance))
             await self.db.commit()
 
     '''async def add_cart_acc(self, geo, price, count):
@@ -150,9 +150,70 @@ class DatabaseBot:
                 rows = await cursor.fetchall()
         return rows
 
+    async def get_item(self, user_id):
+        async with self.lock:
+            async with self.db.execute('''
+                SELECT item FROM cart WHERE user_id = ?
+            ''', (user_id,)) as cursor:     #, region = ?, count_item = ?
+                rows = await cursor.fetchall()
+        return rows
+
+    async def sum_count_acc(self, user_id):
+        async with self.lock:
+            async with self.db.execute('''
+                SELECT SUM(count_item) FROM cart WHERE user_id = ?
+            ''', (user_id,)) as cursor:
+                res = await cursor.fetchone()
+                return res[0] if res else None
+
+    async def get_count_geo(self, geo):
+        async with self.lock:
+            async with self.db.execute('SELECT COUNT(geo_acc) FROM accounts WHERE geo_acc = ?', (geo,)) as cursor:
+                res = await cursor.fetchone()
+                return res[0]
+
+    async def get_all_users(self):
+        async with self.lock:
+            async with self.db.execute('SELECT * FROM users') as cursor:
+                res = await cursor.fetchall()
+                return res
+
+    async def get__geo(self, geo):
+        now = datetime.now()
+        intervals = [
+            ("less_4h", now - timedelta(hours=4)),
+            ("more_4h", now - timedelta(hours=4)),
+            ("more_12h", now - timedelta(hours=12)),
+            ("more_24h", now - timedelta(hours=24)),
+            ("more_36h", now - timedelta(hours=36)),
+        ]
+        counts = {}
+        async with self.db.cursor() as cursor:
+            for key, time_point in intervals:
+                if key == "less_4h":
+                    await cursor.execute("SELECT COUNT(*) FROM accounts WHERE geo_acc = ? AND date_add >= ?",
+                                         (geo, time_point))
+                else:
+                    await cursor.execute("SELECT COUNT(*) FROM accounts WHERE geo_acc = ? AND date_add < ?",
+                                         (geo, time_point))
+                result = await cursor.fetchone()
+                counts[key] = result[0]
+        return counts
+
+    async def get_old_items(self):
+        async with self.lock:
+            cursor = await self.db.execute('''SELECT item FROM cart WHERE added_at < datetime('now', '-30 minutes')''')
+            rows = await cursor.fetchall()
+            return [row[0] for row in rows]
+
     async def delete_old_items(self):
         async with self.lock:
             await self.db.execute('''DELETE FROM cart WHERE added_at < datetime('now', '-30 minutes')''')
+            await self.db.commit()
+
+    async def del_geo_acc(self, phonk_id):
+        async with self.lock:
+            await self.db.execute('DELETE FROM countries WHERE region = ?', (phonk_id,))
             await self.db.commit()
 
     async def get_id_cart(self, user_id):
@@ -166,6 +227,11 @@ class DatabaseBot:
     async def update_balance_user_plus(self, user_id, money):
         async with self.lock:
             await self.db.execute('UPDATE users SET balance = ? WHERE user_id = ?', (float(money), user_id,))
+            await self.db.commit()
+
+    async def update_balance_user(self, user_id, money):
+        async with self.lock:
+            await self.db.execute('UPDATE users SET counts_accounts = ? WHERE user_id = ?', (int(money), user_id,))
             await self.db.commit()
 
     async def delete_item(self, user_id):
@@ -182,17 +248,50 @@ class DatabaseBot:
             ''', (date_purchase, sum_purchase))
             await self.db.commit()
 
+    async def insert_check(self, sum_purchase, number_check, user_id, string):
+        date_purchase = datetime.now().strftime('%Y-%m-%d %H:%M')  # Форматирование даты до минуты
+        async with self.lock:
+            await self.db.execute('INSERT INTO checks (number_check, user_id, date_create, price, items) VALUES (?, ?, ?, ?, ?) ', (number_check, user_id, date_purchase, sum_purchase, string))
+            await self.db.commit()
+
+    async def insert_account(self, geo_acc, accounts):
+        date_purchase = datetime.now().strftime('%Y-%m-%d %H:%M')  # Форматирование даты до минуты
+        async with self.lock:
+            await self.db.execute('INSERT INTO accounts (geo_acc, accounts, date_add) VALUES (?, ?, ?) ', (geo_acc, accounts, date_purchase))
+            await self.db.commit()
+
+
     async def get_user_info(self, user_id):
         async with self.lock:
             async with self.db.execute('SELECT * FROM users WHERE user_id = ?', (user_id,)) as cursor:
                 res = await cursor.fetchone()
                 return res
 
+    async def get_countries_sum(self, country_name):
+        async with self.lock:
+            async with self.db.execute('SELECT * FROM countries WHERE region = ?', (country_name,)) as cursor:
+                res = await cursor.fetchone()
+                return res
+
+
+    async def update_geo_acc(self, user_id, final_balance):
+        async with self.lock:
+            await self.db.execute('UPDATE countries SET price = ? WHERE region = ?', ( final_balance , user_id))
+            await self.db.commit()
+
+
     async def get_countries_acc(self):
             async with self.lock:
-                async with self.db.execute('SELECT region, price FROM countries') as cursor:
+                async with self.db.execute('SELECT region, price, names FROM countries') as cursor:
                     rows = await cursor.fetchall()
             return rows
+
+    async def get_names_countries_acc(self, region):
+        async with self.lock:
+            async with self.db.execute('SELECT names FROM countries WHERE region = ?', (region,)) as cursor:
+                res = await cursor.fetchone()
+                return res[0] if res else None
+
 
 
 async def main():
