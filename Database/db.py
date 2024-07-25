@@ -1,6 +1,8 @@
 import aiosqlite
 import asyncio
+import pytz
 from datetime import datetime, timedelta
+
 import traceback
 
 
@@ -172,32 +174,177 @@ class DatabaseBot:
                 res = await cursor.fetchone()
                 return res[0]
 
-    async def get_all_users(self):
+    async def get_select_geo_min_4(self, geo):
+        # Вычисляем время 4 часа назад от текущего времени UTC
+        four_hours_ago = datetime.utcnow() - timedelta(hours=4)
+        formatted_time = four_hours_ago.strftime('%Y-%m-%d %H:%M:%S')
+
         async with self.lock:
-            async with self.db.execute('SELECT * FROM users') as cursor:
+            query = '''
+                SELECT accounts
+                FROM accounts
+                WHERE geo_acc = ? AND date_add > ?
+            '''
+            async with self.db.execute(query, (geo, formatted_time)) as cursor:
+                res = await cursor.fetchone()
+                return res[0] if res else None
+
+    async def get_acc_less_than_4_hours(self, limit, geo):
+        now = datetime.utcnow()
+        max_time = now - timedelta(hours=4)
+
+        query = """
+        SELECT accounts FROM accounts
+        WHERE date_add > ?
+        AND geo_acc = ?
+        LIMIT ?
+        """
+
+        async with self.lock:
+            async with self.db.execute(query, (max_time, geo, limit)) as cursor:
+                rows = await cursor.fetchall()
+        return [row[0] for row in rows]
+
+    async def get_acc_between_4_and_12_hours(self, limit, geo):
+        now = datetime.utcnow()
+        min_time = now - timedelta(hours=12)
+        max_time = now - timedelta(hours=4)
+
+        query = """
+        SELECT accounts FROM accounts
+        WHERE date_add BETWEEN ? AND ?
+        AND geo_acc = ?
+        LIMIT ?
+        """
+
+        async with self.lock:
+            async with self.db.execute(query, (min_time, max_time, geo, limit)) as cursor:
+                rows = await cursor.fetchall()
+        return [row[0] for row in rows]
+
+    async def get_acc_min_24_max12(self, limit, geo):
+        now = datetime.utcnow()
+        min_time = now - timedelta(hours=24)
+        max_time = now - timedelta(hours=12)
+
+        query = """
+        SELECT accounts FROM accounts
+        WHERE date_add BETWEEN ? AND ?
+        AND geo_acc = ?
+        LIMIT ?
+        """
+
+        async with self.lock:
+            async with self.db.execute(query, (min_time, max_time,geo, limit)) as cursor:
+                rows = await cursor.fetchall()
+        return [row[0] for row in rows]
+
+    async def get_acc_between_24_and_36_hours(self, limit, geo):
+        now = datetime.utcnow()
+        min_time = now - timedelta(hours=36)
+        max_time = now - timedelta(hours=24)
+
+        query = """
+        SELECT accounts FROM accounts
+        WHERE date_add BETWEEN ? AND ?
+        AND geo_acc = ?
+        LIMIT ?
+        """
+
+        async with self.lock:
+            async with self.db.execute(query, (min_time, max_time, geo, limit)) as cursor:
+                rows = await cursor.fetchall()
+        return [row[0] for row in rows]
+
+    async def get_acc_greater_than_36_hours(self, limit, geo):
+        now = datetime.utcnow()
+        min_time = now - timedelta(hours=36)
+
+        query = """
+        SELECT accounts FROM accounts
+        WHERE date_add < ?
+        AND geo_acc = ?
+        LIMIT ?
+        """
+
+        async with self.lock:
+            async with self.db.execute(query, (min_time, geo, limit)) as cursor:
+                rows = await cursor.fetchall()
+        return [row[0] for row in rows]
+
+    async def get_select_geo_by_tips(self, geo, tips, limit):
+        # Вычисляем временные метки для каждого временного диапазона
+        now = datetime.utcnow()
+        time_intervals = {
+            '2': (now - timedelta(hours=4), now - timedelta(hours=12)),
+            '3': (now - timedelta(hours=12), now - timedelta(days=1)),
+            '4': (now - timedelta(days=1), now - timedelta(hours=36)),
+            '5': (now - timedelta(hours=36), None)
+        }
+
+        # Определяем временной диапазон для запроса на основе tips
+        if tips == '1':
+            query_time = (now - timedelta(hours=4)).strftime('%Y-%m-%d %H:%M:%S')
+            query = '''
+                SELECT accounts
+                FROM accounts
+                WHERE geo_acc = ? AND date_add > ?
+                LIMIT ?
+            '''
+            query_params = (geo, query_time, limit)
+        elif tips in time_intervals:
+            start_time, end_time = time_intervals[tips]
+            query = '''
+                SELECT accounts
+                FROM accounts
+                WHERE geo_acc = ? AND date_add > ? AND date_add <= ?
+                LIMIT ?
+            ''' if end_time else '''
+                SELECT accounts
+                FROM accounts
+                WHERE geo_acc = ? AND date_add <= ?
+                LIMIT ?
+            '''
+            query_params = (
+            geo, start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S') if end_time else None,
+            limit)
+        else:
+            # Если `tips` не соответствует ни одному из известных значений, вернем None
+            return None
+
+        async with self.lock:
+            async with self.db.execute(query, query_params) as cursor:
                 res = await cursor.fetchall()
-                return res
+                if res:
+                    # Формируем строку, разделенную запятыми
+                    return ','.join(row[0] for row in res)
+                else:
+                    return None
 
     async def get__geo(self, geo):
         now = datetime.now()
         intervals = [
             ("less_4h", now - timedelta(hours=4)),
-            ("more_4h", now - timedelta(hours=4)),
-            ("more_12h", now - timedelta(hours=12)),
-            ("more_24h", now - timedelta(hours=24)),
+            ("more_4h_less_12h", now - timedelta(hours=4), now - timedelta(hours=12)),
+            ("more_12h_less_24h", now - timedelta(hours=12), now - timedelta(hours=24)),
+            ("more_24h_less_36h", now - timedelta(hours=24), now - timedelta(hours=36)),
             ("more_36h", now - timedelta(hours=36)),
         ]
         counts = {}
         async with self.db.cursor() as cursor:
-            for key, time_point in intervals:
-                if key == "less_4h":
+            for interval in intervals:
+                if interval[0] == "less_4h":
                     await cursor.execute("SELECT COUNT(*) FROM accounts WHERE geo_acc = ? AND date_add >= ?",
-                                         (geo, time_point))
-                else:
+                                         (geo, interval[1]))
+                elif interval[0] == "more_36h":
                     await cursor.execute("SELECT COUNT(*) FROM accounts WHERE geo_acc = ? AND date_add < ?",
-                                         (geo, time_point))
+                                         (geo, interval[1]))
+                else:
+                    await cursor.execute(
+                        "SELECT COUNT(*) FROM accounts WHERE geo_acc = ? AND date_add < ? AND date_add >= ?",
+                        (geo, interval[1], interval[2]))
                 result = await cursor.fetchone()
-                counts[key] = result[0]
+                counts[interval[0]] = result[0]
         return counts
 
     async def get_old_items(self):
@@ -223,6 +370,14 @@ class DatabaseBot:
             ''', (user_id,)) as cursor:
                 rows = await cursor.fetchall()
         return rows
+
+    async def get_price_country(self, geo):
+        async with self.lock:
+            async with self.db.execute('''
+                SELECT price FROM countries WHERE region = ?
+            ''', (geo,)) as cursor:
+                rows = await cursor.fetchall()
+        return rows[0]
 
     async def update_balance_user_plus(self, user_id, money):
         async with self.lock:

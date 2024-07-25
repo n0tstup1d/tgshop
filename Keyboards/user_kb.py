@@ -25,7 +25,7 @@ main_menu_sub.add(e,y)
 
 async def cart_pay(total_amount, number_check, user_id):
     kb = InlineKeyboardMarkup(row_width=2)
-    e = InlineKeyboardButton(text = 'Оплатить💸', callback_data=f'bk_{total_amount}_{number_check}_{user_id}')
+    e = InlineKeyboardButton(text = 'Оплатить💸', callback_data=f'format_{total_amount}_{number_check}_{user_id}_')#callback_data=f'bk_{total_amount}_{number_check}_{user_id}')
     y = InlineKeyboardButton(text = 'Очистить корзину❌', callback_data='clearcart')
     # r = KeyboardButton(text = 'Купить номер')
     t = InlineKeyboardButton(text = 'Назад', callback_data='show_shop')
@@ -57,17 +57,35 @@ async def profile_payments_kb(sum, com):
     kb.add(qw,q, w, r, t)
     return kb
 
-async def time_otlega(geo, price):
+async def time_otlega(geo, price ,c1,c2,c3,c4,c5):
     kb = InlineKeyboardMarkup(row_width=2)
-    qw = InlineKeyboardButton(text='1️⃣', callback_data=f'tip_1_{geo}_{price}')
-    q = InlineKeyboardButton(text = '2️⃣', callback_data=f'tip_2_{geo}_{price}')
-    w = InlineKeyboardButton(text = '️3️⃣', callback_data=f'tip_3_{geo}_{price}')
-    r = InlineKeyboardButton(text = '4️⃣', callback_data=f'tip_4_{geo}_{price}')
-    t = InlineKeyboardButton(text = '5️⃣',callback_data=f'tip_5_{geo}_{price}')
+    qw = InlineKeyboardButton(text='1️⃣', callback_data=f'tip_1_{geo}_{price}_{c1}')
+    q = InlineKeyboardButton(text = '2️⃣', callback_data=f'tip_2_{geo}_{price}_{c2}')
+    w = InlineKeyboardButton(text = '️3️⃣', callback_data=f'tip_3_{geo}_{price}_{c3}')
+    r = InlineKeyboardButton(text = '4️⃣', callback_data=f'tip_4_{geo}_{price}_{c4}')
+    t = InlineKeyboardButton(text = '5️⃣',callback_data=f'tip_5_{geo}_{price}_{c5}')
     back = InlineKeyboardButton(text='Назад', callback_data=f'show_shop')
     kb.add(qw,q, w, r, t)
     kb.add(back)
     return kb
+
+async def write_cart(geo, count, tips):
+    kb = InlineKeyboardMarkup(row_width=2)
+    qw = InlineKeyboardButton(text='🔙 Назад', callback_data=f'f')
+    q = InlineKeyboardButton(text='В корзину', callback_data=f'additemin_{geo}_{count}_{tips}')
+    back = InlineKeyboardButton(text='❌ Отмена', callback_data=f'show_shop')
+    kb.add(qw,q)
+    kb.add(back)
+    return kb
+
+kb_pls = InlineKeyboardMarkup(row_width=2)
+qw = InlineKeyboardButton(text='🔙 Назад', callback_data=f'f')
+q = InlineKeyboardButton(text='В корзину', callback_data=f'additemin')
+back = InlineKeyboardButton(text='❌ Отмена', callback_data=f'show_shop')
+kb_pls.add(qw,q)
+kb_pls.add(back)
+
+
 
 async def profile_buyments_kb(price, com, number_check, user_id):
     kb = InlineKeyboardMarkup(row_width=2)
@@ -80,14 +98,14 @@ async def profile_buyments_kb(price, com, number_check, user_id):
     return kb
 
 
-async def shop_acc_kb(region, price, count):
+'''async def shop_acc_kb(region, price, count):
     kb = InlineKeyboardMarkup(row_width=2)
     r = InlineKeyboardButton(text='Добавить в корзину 🛒', callback_data=f'additemincart_{region}_{price}_{count}')
     #q = InlineKeyboardButton(text='Оплатить 💸', callback_data=f'buy_{region}_{price}_{count}')
     w = InlineKeyboardButton(text='Назад', callback_data='cancel_mail')
     kb.add(r)
     kb.add(w)
-    return  kb
+    return  kb'''
 async def mail_back_kb():
     kb = InlineKeyboardMarkup(row_width=1)
     w = InlineKeyboardButton(text='Назад', callback_data='cancel_mail')
