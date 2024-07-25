@@ -52,16 +52,30 @@ def random_string(length):
 
 async def delete_old_items_periodically():
     while True:
+        print(f'Начало очистки в {datetime.today()}')
         async with db.DatabaseBot("Database/db.db") as db_bot:
-            old_items = await db_bot.get_old_items()
-            print(old_items)
-            with open('accounts_del.txt', 'a') as file:
-                for item in old_items:
-                    file.write(f"{item}\n")
-            await db_bot.delete_old_items()
+            tems = await db_bot.get_old_items()
+            if tems:  # Проверка, что список не пуст
+                tems_json_str = tems[0]
+                        # Преобразуем JSON-строку обратно в список Python
+                tems_list = json.loads(tems_json_str)
+                # Выводим список в нужном формате
+                print(tems_list)
+                for value in tems_list:
+                    print(value)
+                    parts = value
+                    tt = parts.split(':')
+                    print(tt[0])
+                    geo = tt[0]
+                    async with db.DatabaseBot("Database/db.db") as db_bot:
+                        await db_bot.insert_account(geo, value)
 
-        print(f"Очистка корзины в {datetime.today()}")
-        await asyncio.sleep(120)  # Ожидаем 30 минут
+                async with db.DatabaseBot("Database/db.db") as db_bot:
+                    await db_bot.delete_old_items()
+            else:
+                print('Корзины пусты')
+        print(f"Очистка корзины окончена в {datetime.today()}")
+        await asyncio.sleep(60)  # Ожидаем 30 минут
 
 def extract_accounts(country_code, count):
     tag = count
@@ -184,9 +198,9 @@ async def text(message:types.Message):
     if message.text == "🗑 Корзина":
         print(message.from_user.id)
         async with db.DatabaseBot("Database/db.db") as db_bot:
-            id_cart = await db_bot.get_id_cart(message.from_user.id)
+            id_cart = await db_bot.get_id_cart(message.chat.id)
         async with db.DatabaseBot("Database/db.db") as db_bot:
-            items = await db_bot.get_items(message.from_user.id)
+            items = await db_bot.get_items(message.chat.id)
         print(f"{items}\n↑ items")
         total_amount = 0.0
         # Итерация по каждому кортежу
@@ -203,11 +217,13 @@ async def text(message:types.Message):
             number_check = str(id_cart[0][0])
             user_id = message.chat.id
             response_text = (f"Номер вашего заказа: `{str(id_cart[0][0])}`\n\n"
-                             f"Заказ:\n")
+                             f"Ваша корзина:\n")
             for item in items:
                 id_value, country, amount = item
                 #print(f"Обработанный элемент: Количество={id_value}, Страна={country}, Сумма={amount}, Текущая общая сумма={total_amount}")
-                response_text += f"Страна {country} | {id_value} шт. | {amount} ₽\n"
+                response_text += (f"➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n"
+                                  f"Страна {country} | {id_value} шт. | {amount} ₽\n"
+                                  f"➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n")
                 total_amount += amount
 
             response_text += f"\nСумма к оплате: {total_amount} ₽ "
@@ -420,13 +436,41 @@ async def call(call: CallbackQuery):
         await state.update_data(price=price)'''
         '''await bot.edit_message_text('Введите кол-во аккаунтов',call.message.chat.id,call.message.message_id,reply_markup=user_kb.kb_shop_back)
         
+        
+        
         '''
     elif call.data.startswith('clearcart'):
         item = call.message.get_args()
         print(call.message.chat.id)
         async with db.DatabaseBot("Database/db.db") as db_bot:
+            tems = await db_bot.get_item(call.message.chat.id)
+        print(tems)
+        for idx, item in enumerate(tems):
+            it = item[0]
+            cleaned_string = it.strip("[]'")
+            cleaned_string = cleaned_string.replace("\\n", "\n").replace("', '", "\n")
+            cleanedd_string = "\n".join([line.strip() for line in cleaned_string.splitlines() if line.strip()])
+            print(cleanedd_string)
+
+            cleanedt_text = cleanedd_string.strip('"')
+
+            # Replace comma and space with a newline character
+            cleaneds_text = cleanedt_text.replace('", "', '\n')
+            lines = cleaneds_text.split('\n')
+            print(lines)
+            t = 0
+            for value in lines:
+                print(lines[t])
+                parts = lines[t]
+                tt = parts.split(':')
+                geo = tt[0]
+                print(geo)
+                async with db.DatabaseBot("Database/db.db") as db_bot:
+                    await db_bot.insert_account(geo,lines[t])
+                t += 1
+        async with db.DatabaseBot("Database/db.db") as db_bot:
             await db_bot.delete_item(call.message.chat.id)
-        await call.message.reply(f"Корзина очищена ❌")
+        await bot.edit_message_text(f"Корзина очищена ❌",call.message.chat.id, call.message.message_id)
     elif call.data.startswith('show_shop'):
         await bot.edit_message_text(f"---------------- В наличии ----------------\n",call.message.chat.id, call.message.message_id,
                                reply_markup=await user_kb.shop_menu_acc())
@@ -438,10 +482,12 @@ async def call(call: CallbackQuery):
         print(com)
         num_check = call.data.split('_')[3]
         user_id = call.data.split('_')[4]
+        tips = call.data.split('_')[5]
+        print(tips)
         url_lolz=str(market.payments.generate_link(username='notstupid', user_id='7591946', comment=com, currency=Constants.Market.Currency.rub, amount=rubles))
         kb = InlineKeyboardMarkup(row_width=1)
         q = InlineKeyboardButton(text='Перейти к оплате', url=url_lolz)
-        qq = InlineKeyboardButton(text='Проверить оплату', callback_data=f'check_lolzbuy_{rubles}_{com}_{num_check}_{user_id}')
+        qq = InlineKeyboardButton(text='Проверить оплату', callback_data=f'check_lolzbuy_{rubles}_{com}_{num_check}_{user_id}_{tips}')
         w = InlineKeyboardButton(text='Отменить', callback_data=f'cancel_order')
         kb.add(q,qq,w)
         await bot.edit_message_text(f'🆙 Пополнение баланса\n'
@@ -461,6 +507,7 @@ async def call(call: CallbackQuery):
         comment = call.data.split('_')[3]
         number_check = call.data.split('_')[4]
         user_id = call.data.split('_')[5]
+        tips = call.data.split('_')[6]
         print(amount)
         print(comment)
         result = await CheckPayment(market, amount=amount,comment=comment, include_payment_data=True)
@@ -478,22 +525,65 @@ async def call(call: CallbackQuery):
             #    await db_bot.update_balance_user_plus(call.message.chat.id)
             async with db.DatabaseBot("Database/db.db") as db_bot:
                 items = await db_bot.get_item(call.message.chat.id)
+
+            # Assuming `items` is a list of tuples containing strings
+
+            '''if isinstance(items, list):
+                accounts = json.dumps(items)
+            cleaned_string = accounts.strip("[]'")
+
+            # Replace new line characters and unwanted separators
+            cleaned_string = cleaned_string.replace("\\n", "\n").replace("', '", "\n")
+
+            # Strip whitespace from each line and remove empty lines
+            cleaned_string = "\n".join([line.strip() for line in cleaned_string.splitlines() if line.strip()])
+'''
             strc = ""
             for idx, item in enumerate(items):
                 it = item[0]
                 cleaned_string = it.strip("[]'")
                 cleaned_string = cleaned_string.replace("\\n", "\n").replace("', '", "\n")
-                cleaned_string = "\n".join([line.strip() for line in cleaned_string.splitlines() if line.strip()])
+                cleanedd_string = "\n".join([line.strip() for line in cleaned_string.splitlines() if line.strip()])
+                print(cleanedd_string)
+
+                cleanedt_text = cleanedd_string.strip('"')
+
+                # Replace comma and space with a newline character
+                cleaneds_text = cleanedt_text.replace('", "', '\n')
                 rand = random.randint(1, 999999999999999)
-                file_path = f"Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt"
-                with open(file_path, "w") as file:
-                    file.write(cleaned_string)
+                lines = cleaneds_text.split('\n')
+                t = 0
+                for value in lines:
+                    print(lines[t])
+                    parts = lines[t]
+                    tt = parts.split(':')
+                    geo = tt[0]
+                    user = tt[1]
+                    pass_tt = tt[2]
+                    mail = tt[3]
+                    pass_mail = tt[4]
+                    text_file = ""
+                    if tips == '1':
+                        text_file = f"{mail}:{pass_mail}\n"
+                    elif tips == '2':
+                        text_file = f"@{user}:{pass_tt}\n"
+                        print(f"tt{text_file}")
+                    elif tips == '3':
+                        text_file = f"@{user}:{pass_tt}:{mail}:{pass_mail}\n"
+                    elif tips == '4':
+                        text_file = f"{geo}:@{user}:{pass_tt}:{mail}:{pass_mail}\n"
+                    print(text_file)
+                    print(f'{t}+{lines[t]}')
+                    file_path = f"Temp/giveacc/zakaz_{call.message.chat.id}_{rand}_{idx}.txt"
+                    with open(file_path, "a") as file:
+                        file.write(text_file)
+                    t += 1
 
                 await bot.send_document(call.message.chat.id,
-                                        open(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt', 'rb'))
+                                        open(f'Temp/giveacc/zakaz_{call.message.chat.id}_{rand}_{idx}.txt', 'rb'))
                 strc += cleaned_string
                 try:
-                    os.remove(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt')
+                    os.remove(f'Temp/giveacc/zakaz_{call.message.chat.id}_{rand}_{idx}.txt')
                 except:
                     pass
             async with db.DatabaseBot("Database/db.db") as db_bot:
@@ -538,6 +628,8 @@ async def call(call: CallbackQuery):
             amount = call.data.split('_')[3]
             number_check = call.data.split('_')[4]
             user_id = call.data.split('_')[5]
+            tips = call.data.split('_')[6]
+
             status = await cryptobot.check_status(amount,id_pay)
             if status == 'paid':
                 await bot.edit_message_text(f'Оплата прошла успешно. Идёт отправка...',
@@ -547,16 +639,69 @@ async def call(call: CallbackQuery):
                 #    await db_bot.update_balance_user_plus(call.message.chat.id)
                 async with db.DatabaseBot("Database/db.db") as db_bot:
                     items = await db_bot.get_item(call.message.chat.id)
+
+                # Assuming `items` is a list of tuples containing strings
+
+
+                '''if isinstance(items, list):
+                    accounts = json.dumps(items)
+                cleaned_string = accounts.strip("[]'")
+
+                # Replace new line characters and unwanted separators
+                cleaned_string = cleaned_string.replace("\\n", "\n").replace("', '", "\n")
+
+                # Strip whitespace from each line and remove empty lines
+                cleaned_string = "\n".join([line.strip() for line in cleaned_string.splitlines() if line.strip()])
+'''
                 strc = ""
                 for idx, item in enumerate(items):
                     it = item[0]
                     cleaned_string = it.strip("[]'")
                     cleaned_string = cleaned_string.replace("\\n", "\n").replace("', '", "\n")
-                    cleaned_string = "\n".join([line.strip() for line in cleaned_string.splitlines() if line.strip()])
+                    cleanedd_string = "\n".join([line.strip() for line in cleaned_string.splitlines() if line.strip()])
+                    print(cleanedd_string)
+
+                    cleanedt_text = cleanedd_string.strip('"')
+
+                    # Replace comma and space with a newline character
+                    cleaneds_text = cleanedt_text.replace('", "', '\n')
                     rand = random.randint(1, 999999999999999)
-                    file_path = f"Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt"
-                    with open(file_path, "w") as file:
-                        file.write(cleaned_string)
+                    lines = cleaneds_text.split('\n')
+                    t = 0
+                    for value in lines:
+                        print(lines[t])
+                        parts = lines[t]
+                        tt = parts.split(':')
+                        geo = tt[0]
+                        user = tt[1]
+                        pass_tt = tt[2]
+                        mail = tt[3]
+                        pass_mail = tt[4]
+                        text_file = ""
+                        if tips == '1':
+                            text_file = f"{mail}:{pass_mail}\n"
+                        elif tips == '2':
+                            text_file = f"@{user}:{pass_tt}\n"
+                            print(f"tt{text_file}")
+                        elif tips == '3':
+                            text_file = f"@{user}:{pass_tt}:{mail}:{pass_mail}\n"
+                        elif tips == '4':
+                            text_file = f"{geo}:@{user}:{pass_tt}:{mail}:{pass_mail}\n"
+                        print(text_file)
+                        print(f'{t}+{lines[t]}')
+                        file_path = f"Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt"
+                        with open(file_path, "a") as file:
+                            file.write(text_file)
+                        t += 1
+                    # Get the third line (index 2)
+                    third_line = lines[2]
+
+                    # Print the third line
+                    print(third_line)
+
+                    # Print the result
+                    print(cleaneds_text)
+
 
                     await bot.send_document(call.message.chat.id, open(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt', 'rb'))
                     strc += cleaned_string
@@ -579,10 +724,11 @@ async def call(call: CallbackQuery):
         except Exception as e:
             print(traceback.format_exc())
 
-    elif call.data == 'format_':
+            '''elif call.data == 'format_':
         total_amount = call.data.split('_')[1]
         number_check = call.data.split('_')[2]
-        user_id = call.data.split('_')[3]
+        user_id = call.data.split('_')[3] '''
+
 
 
     elif call.data.startswith('profile_pay_'):
@@ -603,28 +749,133 @@ async def call(call: CallbackQuery):
         print(float(sum))
         number_check = call.data.split('_')[4]
         user_id = call.data.split('_')[5]
+        tips = call.data.split('_')[6]
         rez_pay = await cryptobot.order(float(sum), type_crypto)
         kb = InlineKeyboardMarkup(row_width=1)
         q = InlineKeyboardButton(text='Перейти к оплате', url=rez_pay[0])
-        qq = InlineKeyboardButton(text='Проверить оплату', callback_data=f'prcheck_buy_{rez_pay[1]}_{sum}_{number_check}_{user_id}')
+        qq = InlineKeyboardButton(text='Проверить оплату', callback_data=f'prcheck_buy_{rez_pay[1]}_{sum}_{number_check}_{user_id}_{tips}')
         w = InlineKeyboardButton(text='Отменить', callback_data=f'prof_cancel_order')
         kb.add(q, qq, w)
         await bot.edit_message_text(f'🆙 Пополнение\n➖➖➖➖➖➖➖➖➖➖➖➖➖\n➖➖➖➖➖➖➖➖➖➖➖➖➖\n💰 Сумма пополнения: {sum} ₽ \n➖➖➖➖➖➖➖➖➖➖➖➖➖\n➖➖➖➖➖➖➖➖➖➖➖➖➖\n ‼️После оплаты, обязательно нажмите проверить оплату‼️',
                                     call.message.chat.id, call.message.message_id, reply_markup=kb)
+
+    elif call.data.startswith('tipbuy_'):
+        amount = call.data.split('_')[1]
+        number_check = call.data.split('_')[2]
+        user_id = call.data.split('_')[3]
+        tips = call.data.split('_')[4]
+        com = random.randint(1000000000000,999999999999999999999)
+        print(1)
+        await bot.edit_message_text('Выберите способ оплаты', call.message.chat.id, call.message.message_id,
+                                    reply_markup=await user_kb.profile_buyments_kb(amount, com, number_check, user_id, tips))
+
 
     elif call.data == 'prof_cancel_order':
         await bot.edit_message_text(
             f'Отмена оплаты',
             call.message.chat.id, call.message.message_id, reply_markup=user_kb.balance_kb)
 
-    elif call.data.startswith('bk_'):
+    elif call.data.startswith('for_'):
+        format = call.data.split('_')[1]
+        amount = call.data.split('_')[2]
+        number_check = call.data.split('_')[3]
+        user_id = call.data.split('_')[4]
+        com = random_string(30)
+        print(1)
+        print(1)
+        #await bot.edit_message_text('Выберите способ оплаты', call.message.chat.id, call.message.message_id, reply_markup=await user_kb.profile_buyments_kb(amount, com, number_check, user_id))
+        print(call.message.chat.id)
+        async with db.DatabaseBot("Database/db.db") as db_bot:
+            id_cart = await db_bot.get_id_cart(call.message.chat.id)
+        async with db.DatabaseBot("Database/db.db") as db_bot:
+            items = await db_bot.get_items(call.message.chat.id)
+        print(f"{items}\n↑ items")
+        total_amount = 0.0
+        for item in items:
+            id_value, country, amount = item
+            total_amount += amount
+        if format == '1':
+            text_message = 'mail:pass_mail'
+        elif format == '2':
+            text_message = '@user:pass_TT'
+        elif format == '3':
+            text_message = '@user:pass_TT:mail:pass_mail'
+        elif format == '4':
+            text_message = 'GEO:@user:pass_TT:mail:pass_mail'
+        response_text = ""
+        if items:
+            total_amount = 0
+            number_check = str(id_cart[0][0])
+            user_id = call.message.chat.id
+            response_text = (f"Номер вашего заказа: <code>{str(id_cart[0][0])}</code>\n\n"
+                             f"Ваша корзина:\n")
+            for item in items:
+                id_value, country, amount = item
+                # print(f"Обработанный элемент: Количество={id_value}, Страна={country}, Сумма={amount}, Текущая общая сумма={total_amount}")
+                response_text += (f"➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n"
+                                  f"Страна {country} | {id_value} шт | {amount} ₽\n"
+                                  f"➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n")
+                total_amount += amount
+
+            response_text += (f"Сумма к оплате: {total_amount} ₽\n"
+                              f"➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n"
+                              f"Выбран формат:\n"
+                              f"*️⃣ {text_message}")
+            await bot.edit_message_text(response_text,chat_id=call.message.chat.id, message_id=call.message.message_id,#parse_mode='Markdown',
+                                 reply_markup=await user_kb.cart_less_pay(total_amount, number_check, user_id, format))
+        else:
+            await bot.send_message(call.message.chat.id, "🛒 Корзина пуста", reply_markup=user_kb.kb_cart_shop)
+
+
+    elif call.data.startswith('bkt_'):
         amount = call.data.split('_')[1]
         number_check = call.data.split('_')[2]
         user_id = call.data.split('_')[3]
         com = random_string(30)
         print(1)
-        await bot.edit_message_text('Выберите способ оплаты', call.message.chat.id, call.message.message_id, reply_markup=await user_kb.profile_buyments_kb(amount, com, number_check, user_id))
+        print(2)
+        #await bot.edit_message_text('Выберите способ оплаты', call.message.chat.id, call.message.message_id, reply_markup=await user_kb.profile_buyments_kb(amount, com, number_check, user_id))
+        print(call.message.chat.id)
+        async with db.DatabaseBot("Database/db.db") as db_bot:
+            id_cart = await db_bot.get_id_cart(call.message.chat.id)
+        async with db.DatabaseBot("Database/db.db") as db_bot:
+            items = await db_bot.get_items(call.message.chat.id)
+        print(f"{items}\n↑ items")
+        total_amount = 0.0
+        # Итерация по каждому кортежу
+        for item in items:
+            id_value, country, amount = item
+            # Сложение amount
+            total_amount += amount
 
+        # Печать суммы всех amount
+        response_text = ""
+        if items:
+            total_amount = 0
+            # Извлечение значения
+            number_check = str(id_cart[0][0])
+            user_id = call.message.chat.id
+            response_text = (f"Номер вашего заказа: <code>{str(id_cart[0][0])}</code>\n\n"
+                             f"Ваша корзина:\n")
+            for item in items:
+                id_value, country, amount = item
+                # print(f"Обработанный элемент: Количество={id_value}, Страна={country}, Сумма={amount}, Текущая общая сумма={total_amount}")
+                response_text += (f"➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n"
+                                  f"Страна {country} | {id_value} шт. | {amount} ₽\n"
+                                  f"➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n")
+                total_amount += amount
+
+            response_text += (f"Сумма к оплате: {total_amount} ₽\n"
+                              f"➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n"
+                              f"🧾 Выберите формат:\n\n"
+                              f"1️⃣ - mail:pass_mail\n"
+                              f"2️⃣ - @user:pass_TT\n"
+                              f"3️⃣ - @user:pass_TT:mail:pass_mail\n"
+                              f"4️⃣ - GEO:@user:pass_TT:mail:pass_mail\n")
+            await bot.edit_message_text(response_text,chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                 reply_markup=await user_kb.cart_less_format(total_amount, number_check, user_id))
+        else:
+            await bot.send_message(call.message.chat.id, "🛒 Корзина пуста", reply_markup=user_kb.kb_cart_shop)
 
     '''elif call.data.startswith( 'additemin'):
         #await bot.edit_message_text('Введите кол-во аккаунтов',call.message.chat.id,call.message.message_id,reply_markup=user_kb.kb_shop_back)
@@ -860,26 +1111,23 @@ async def handle_add_item(call: types.CallbackQuery, state: FSMContext):
             accounts = await db_bot.get_acc_between_24_and_36_hours(count, geo)
         elif tips == '5':
             accounts = await db_bot.get_acc_greater_than_36_hours(count, geo)
-        if isinstance(accounts, list):
-            accounts = json.dumps(accounts)
-        cleaned_string = accounts.strip("[]'")
-
-        # Replace new line characters and unwanted separators
-        cleaned_string = cleaned_string.replace("\\n", "\n").replace("', '", "\n")
-
-        # Strip whitespace from each line and remove empty lines
-        cleaned_string = "\n".join([line.strip() for line in cleaned_string.splitlines() if line.strip()])
-
-        # Print the cleaned string
-        print(cleaned_string)
+        account = accounts
         price = await db_bot.get_price_country(geo)
         print(price[0])
         price_fin = int(count) * int(price[0])
         print(call.message.chat.id, geo, accounts, count, price_fin)
-        await db_bot.add_item(call.message.chat.id, geo, accounts,  price_fin, count)
-    await bot.edit_message_text( f"Успешно добавлен в вашу корзину. ✔\n"
-                                 f"❗ Через 30 минут, ваша корзина будет очищена", call.message.chat.id, call.message.message_id)
 
+        async with db.DatabaseBot("Database/db.db") as db_bot:
+            if isinstance(accounts, list):
+                accounts = json.dumps(accounts)
+            await db_bot.add_item(call.message.chat.id, geo, accounts, price_fin, count)
+        for entry in account:
+            print("Удалён → "+ entry)
+            async with db.DatabaseBot("Database/db.db") as db_bot:
+                await db_bot.delete_item_item(entry)
+    await bot.edit_message_text(f"Успешно добавлен в вашу корзину. ✔\n"
+                                f"❗ Через 30 минут, ваша корзина будет очищена", call.message.chat.id,
+                                call.message.message_id)
 
 
 @dp.message_handler(state=states.adm_states.input_new_geo_sum_new)

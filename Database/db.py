@@ -212,7 +212,7 @@ class DatabaseBot:
 
         query = """
         SELECT accounts FROM accounts
-        WHERE date_add BETWEEN ? AND ?
+        WHERE ? > date_add < ?
         AND geo_acc = ?
         LIMIT ?
         """
@@ -229,7 +229,7 @@ class DatabaseBot:
 
         query = """
         SELECT accounts FROM accounts
-        WHERE date_add BETWEEN ? AND ?
+        WHERE ? > date_add < ?
         AND geo_acc = ?
         LIMIT ?
         """
@@ -244,16 +244,24 @@ class DatabaseBot:
         min_time = now - timedelta(hours=36)
         max_time = now - timedelta(hours=24)
 
+
+        print(f"min_time: {min_time}, max_time: {max_time}, geo: {geo}, limit: {limit}")
+
         query = """
         SELECT accounts FROM accounts
-        WHERE date_add BETWEEN ? AND ?
+        WHERE ? > date_add < ?
         AND geo_acc = ?
         LIMIT ?
         """
 
         async with self.lock:
-            async with self.db.execute(query, (min_time, max_time, geo, limit)) as cursor:
-                rows = await cursor.fetchall()
+            try:
+                async with self.db.execute(query, (min_time, max_time, geo, limit)) as cursor:
+                    rows = await cursor.fetchall()
+                    print(f"Query returned: {rows}")
+            except Exception as e:
+                print(f"Error executing query: {e}")
+
         return [row[0] for row in rows]
 
     async def get_acc_greater_than_36_hours(self, limit, geo):
@@ -349,9 +357,9 @@ class DatabaseBot:
 
     async def get_old_items(self):
         async with self.lock:
-            cursor = await self.db.execute('''SELECT item FROM cart WHERE added_at < datetime('now', '-30 minutes')''')
-            rows = await cursor.fetchall()
-            return [row[0] for row in rows]
+            async with self.db.execute('''SELECT item FROM cart WHERE added_at < datetime('now', '-30 minutes')''') as cursor:
+                rows = await cursor.fetchall()
+                return [row[0] for row in rows]
 
     async def delete_old_items(self):
         async with self.lock:
@@ -373,9 +381,7 @@ class DatabaseBot:
 
     async def get_price_country(self, geo):
         async with self.lock:
-            async with self.db.execute('''
-                SELECT price FROM countries WHERE region = ?
-            ''', (geo,)) as cursor:
+            async with self.db.execute('''SELECT price FROM countries WHERE region = ?''', (geo,)) as cursor:
                 rows = await cursor.fetchall()
         return rows[0]
 
@@ -392,6 +398,11 @@ class DatabaseBot:
     async def delete_item(self, user_id):
         async with self.lock:
             await self.db.execute('DELETE FROM cart WHERE user_id = ?', (user_id,))
+            await self.db.commit()
+
+    async def delete_item_item(self, item):
+        async with self.lock:
+            await self.db.execute('DELETE FROM accounts WHERE accounts = ?', (item,))
             await self.db.commit()
 
     async def insert_purchase(self, sum_purchase: int):
