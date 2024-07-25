@@ -582,10 +582,8 @@ async def call(call: CallbackQuery):
                 await bot.send_document(call.message.chat.id,
                                         open(f'Temp/giveacc/zakaz_{call.message.chat.id}_{rand}_{idx}.txt', 'rb'))
                 strc += cleaned_string
-                try:
-                    os.remove(f'Temp/giveacc/zakaz_{call.message.chat.id}_{rand}_{idx}.txt')
-                except:
-                    pass
+                os.remove(f'Temp/giveacc/zakaz_{call.message.chat.id}_{rand}_{idx}.txt')
+
             async with db.DatabaseBot("Database/db.db") as db_bot:
                 itemss = await db_bot.sum_count_acc(call.message.chat.id)
             async with db.DatabaseBot("Database/db.db") as db_bot:
@@ -705,10 +703,8 @@ async def call(call: CallbackQuery):
 
                     await bot.send_document(call.message.chat.id, open(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt', 'rb'))
                     strc += cleaned_string
-                    try:
-                        os.remove(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt')
-                    except:
-                        pass
+                    os.remove(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt')
+
                 async with db.DatabaseBot("Database/db.db") as db_bot:
                     itemss = await db_bot.sum_count_acc(call.message.chat.id)
                 async with db.DatabaseBot("Database/db.db") as db_bot:
