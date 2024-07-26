@@ -75,7 +75,7 @@ async def delete_old_items_periodically():
             else:
                 print('Корзины пусты')
         print(f"Очистка корзины окончена в {datetime.today()}")
-        await asyncio.sleep(60)  # Ожидаем 30 минут
+        await asyncio.sleep(120)  # Ожидаем 30 минут
 
 def extract_accounts(country_code, count):
     tag = count
@@ -327,7 +327,7 @@ async def call(call: CallbackQuery):
         await states.adm_states.input_del_geo_sum.set()
 
     elif call.data == 'back_adm_panel':
-        await bot.send_message(call.message.chat.id, text='Админ панель', reply_markup=adm_kb.adm_menu)
+        await bot.edit_message_text(chat_id=call.message.chat.id,message_id=call.message.message_id, text='Админ панель', reply_markup=adm_kb.adm_menu)
 
     elif call.data == 'back':
         await bot.edit_message_text('Выберите нужные настройки', call.message.chat.id, call.message.message_id,
@@ -335,7 +335,7 @@ async def call(call: CallbackQuery):
 
     elif call.data == 'mailing':
         await bot.edit_message_text('Отправьте сообщение для рассылки', call.message.chat.id, call.message.message_id,
-                                    reply_markup=adm_kb.cancel_adm_kb)
+                                    reply_markup=adm_kb.cancel_adm_kb_mailingg)
         await states.adm_states.mailing.set()
 
     elif call.data == 'editGEO':
@@ -363,6 +363,7 @@ async def call(call: CallbackQuery):
     elif call.data.startswith('tip_'):
         tips = call.data.split('_')[1]
         geo = call.data.split('_')[2]
+        price = call.data.split('_')[3]
         counts_acc_time = call.data.split('_')[4]
         if tips == '1':
             otlega = 'меньше 4ч'
@@ -385,15 +386,16 @@ async def call(call: CallbackQuery):
             f"(просто отправьте цифру в чат)!\n\n"
             #f"Если Вы ошиблись, цифру можно ввести повторно🔄\n\n"
             f"✅ Доступно к покупке: {counts_acc_time} шт.\n\n"
-            f"🛒 Количество: {countuser} шт. \n\n"
+            f"🛒 Количество: {int(countuser)} шт. \n\n"
 
         )
 
         await bot.edit_message_text(message, call.message.chat.id, call.message.message_id,
-                                    reply_markup=await user_kb.write_cart(geo, int(countuser), int(tips)))
+                                    reply_markup=await user_kb.write_cart(geo, int(countuser), int(tips), price))
         await states.user_states.new_acc_buy.set()
         state = Dispatcher.get_current().current_state()
         await state.update_data(geo=geo)
+        await state.update_data(price=price)
         await state.update_data(tipst=tips)
         await state.update_data(count=countuser)
         await state.update_data(message_id=call.message.message_id)
@@ -600,6 +602,20 @@ async def call(call: CallbackQuery):
             print(0)
             await call.answer(text="!!! Оплата не прошла !!!", show_alert=True)
 
+    elif call.data == 'adm_stat':
+        async with db.DatabaseBot("DataBase/db.db") as db_bot:
+            count_user = await db_bot.get_counts_user()
+        async with db.DatabaseBot("DataBase/db.db") as db_bot:
+            sum_24_hours = await db_bot.sum_last_24_hours()
+            sum_week = await db_bot.sum_last_week()
+            sum_month = await db_bot.sum_last_month()
+        await bot.edit_message_text(f'Кол-во пользователей в боте: {count_user}\n'
+                                    f'\nПрибыль:\n\n'
+                                    f'за 24 часа: {sum_24_hours} ₽\n'
+                                    f'за неделю: {sum_week} ₽\n'
+                                    f'за месяц: {sum_month} ₽\n',
+                                    call.message.chat.id, call.message.message_id, reply_markup=adm_kb.cancel_adm_give_sum)
+
     elif call.data.startswith('prcheck_pay_'):
         try:
             id_pay = call.data.split('_')[2]
@@ -769,7 +785,7 @@ async def call(call: CallbackQuery):
     elif call.data == 'prof_cancel_order':
         await bot.edit_message_text(
             f'Отмена оплаты',
-            call.message.chat.id, call.message.message_id, reply_markup=user_kb.balance_kb)
+            call.message.chat.id, call.message.message_id)
 
     elif call.data.startswith('for_'):
         format = call.data.split('_')[1]
@@ -912,60 +928,168 @@ async def call(call: CallbackQuery):
 async def adm_states_mailing(message:types.Message,state = FSMContext):
     text = message.text
     await state.finish()
-    async with db.DatabaseBot("DataBase/db.db") as db_bot:
-        all_users = await db_bot.get_all_users()
-    for user in all_users:
-        try:
-            await bot.send_message(user[1],text = text)
-        except:
-            pass
-    await bot.send_message(message.chat.id,text = 'Рассылка завершена 💌')
-    await bot.send_message(message.chat.id,text = 'Админ панель',reply_markup=adm_kb.adm_menu)
+    if text.isalpha():
+        async with db.DatabaseBot("DataBase/db.db") as db_bot:
+            all_users = await db_bot.get_all_users()
+        for user in all_users:
+            try:
+                await bot.send_message(user[1],text = text)
+            except:
+                pass
+        await bot.send_message(message.chat.id,text = 'Рассылка завершена 💌')
+        await bot.send_message(message.chat.id,text = 'Админ панель',reply_markup=adm_kb.adm_menu)
+@dp.callback_query_handler(state=states.adm_states.mailing)
+async def adm_states_mailing(call: CallbackQuery, state=FSMContext):
+    await state.finish()
+    await bot.edit_message_text('Админ панель', call.message.chat.id, call.message.message_id,
+                                reply_markup=adm_kb.adm_menu)
 
 
 @dp.message_handler(state=states.user_states.new_acc_buy)
 async def user_states_new_acc_buy(message: types.Message, state: FSMContext):
     countuser = message.text
-    data = await state.get_data()
-    tips = data["tipst"]
-    geo = data["geo"]
-    message_i = data["message_id"]
-    await state.finish()
+    if countuser.isdigit():
+        data = await state.get_data()
+        tips = data["tipst"]
+        geo = data["geo"]
+        price = data["price"]
+        message_i = data["message_id"]
+        await state.finish()
 
-    if tips == '1':
-        otlega = 'меньше 4ч'
-    elif tips == '2':
-        otlega = 'больше 4ч'
-    elif tips == '3':
-        otlega = 'больше 12ч'
-    elif tips == '4':
-        otlega = 'больше 24ч'
-    elif tips == '5':
-        otlega = 'больше 36ч'
+        if tips == '1':
+            otlega = 'меньше 4ч'
+        elif tips == '2':
+            otlega = 'больше 4ч'
+        elif tips == '3':
+            otlega = 'больше 12ч'
+        elif tips == '4':
+            otlega = 'больше 24ч'
+        elif tips == '5':
+            otlega = 'больше 36ч'
 
-    async with db.DatabaseBot("Database/db.db") as db_bot:
-        count = await db_bot.get_count_geo(geo)
+        async with db.DatabaseBot("Database/db.db") as db_bot:
+            count = await db_bot.get_count_geo(geo)
 
-    response_message = (
-        f"Регион: {geo}\nОтлежка: {otlega}\n\n"
-        #f"⬇️Укажите количество аккаунтов сообщением⬇️\n"
-        #f"(просто отправьте цифру в чат)!\n\n"
-        #f"Если Вы ошиблись, цифру можно ввести повторно🔄\n\n"
-        f"✅ Доступно к покупке: {count} шт.\n\n"
-        f"🛒 Количество: {countuser} шт."
-    )
+        response_message = (
+            f"Регион: {geo}\nОтлежка: {otlega}\n\n"
+            #f"⬇️Укажите количество аккаунтов сообщением⬇️\n"
+            #f"(просто отправьте цифру в чат)!\n\n"
+            #f"Если Вы ошиблись, цифру можно ввести повторно🔄\n\n"
+            f"✅ Доступно к покупке: {count} шт.\n\n"
+            f"🛒 Количество: {int(countuser)} шт."
+        )
 
-    await bot.edit_message_text(text=response_message,chat_id=message.chat.id, message_id=message_i, reply_markup=user_kb.kb_pls)
-    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-    await states.user_states.new_acc_buy.set()
-    state = Dispatcher.get_current().current_state()
-    await state.update_data(geo=geo)
-    await state.update_data(tipst=tips)
-    await state.update_data(count=countuser)
+        await bot.edit_message_text(text=response_message,chat_id=message.chat.id, message_id=message_i, reply_markup=await user_kb.write_cart(geo, int(countuser), int(tips), price))
+        await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+        await states.user_states.new_acc_buy.set()
+        state = Dispatcher.get_current().current_state()
+        await state.update_data(geo=geo)
+        await state.update_data(tipst=tips)
+        await state.update_data(count=countuser)
+    else:
+        await state.finish()
 
-#    state = Dispatcher.get_current().current_state()
+@dp.callback_query_handler(state=states.user_states.new_acc_buy)
+async def user_states_new_acc_buy(call: CallbackQuery, state: FSMContext):
+        if call.data.startswith('backaccbuy_'):
+            geo = call.data.split('_')[1]
+            price = call.data.split('_')[2]
+            async with db.DatabaseBot("Database/db.db") as db_bot:
+                counts = await db_bot.get__geo(geo)
+            message = (
+                f"Регион: {geo}\n ⬇️⬇️Доступно к покупке⬇️⬇️\n \n"
+                f"1️⃣ - Отлежка меньше 4ч: {counts['less_4h']} шт.\n\n"
+                f"2️⃣ - Отлежка больше 4ч: {counts['more_4h_less_12h']} шт.\n\n"
+                f"3️⃣ - Отлежка больше 12ч: {counts['more_12h_less_24h']} шт.\n\n"
+                f"4️⃣ - Отлежка больше 24ч: {counts['more_24h_less_36h']} шт.\n\n"
+                f"5️⃣ - Отлежка больше 36ч: {counts['more_36h']} шт."
+            )
+            c1 = int(counts['less_4h'])
+            c2 = int(counts['more_4h_less_12h'])
+            c3 = int(counts['more_12h_less_24h'])
+            c4 = int(counts['more_24h_less_36h'])
+            c5 = int(counts['more_36h'])
+            await bot.edit_message_text(message, call.message.chat.id, call.message.message_id,
+                                        reply_markup=await user_kb.time_otlega(geo, price, c1, c2, c3, c4, c5))
+        elif call.data.startswith('showshopp'):
+            await bot.edit_message_text(f"---------------- В наличии ----------------\n", call.message.chat.id,
+                                        call.message.message_id,
+                                        reply_markup=await user_kb.shop_menu_acc())
 
-    '''count = message.text
+        elif call.data == 'cartback':
+            print(call.message.from_user.id)
+            async with db.DatabaseBot("Database/db.db") as db_bot:
+                id_cart = await db_bot.get_id_cart(call.message.chat.id)
+            async with db.DatabaseBot("Database/db.db") as db_bot:
+                items = await db_bot.get_items(call.message.chat.id)
+            print(f"{items}\n↑ items")
+            total_amount = 0.0
+            for item in items:
+                id_value, country, amount = item
+                total_amount += amount
+
+            response_text = ""
+            if items:
+                total_amount = 0
+                # Извлечение значения
+                number_check = str(id_cart[0][0])
+                user_id = call.message.chat.id
+                response_text = (f"Номер вашего заказа: `{str(id_cart[0][0])}`\n\n"
+                                 f"Ваша корзина:\n")
+                for item in items:
+                    id_value, country, amount = item
+                    # print(f"Обработанный элемент: Количество={id_value}, Страна={country}, Сумма={amount}, Текущая общая сумма={total_amount}")
+                    response_text += (f"➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n"
+                                      f"Страна {country} | {id_value} шт. | {amount} ₽\n"
+                                      f"➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n")
+                    total_amount += amount
+
+                response_text += f"\nСумма к оплате: {total_amount} ₽ "
+
+                await call.message.answer(response_text, parse_mode='Markdown',
+                                     reply_markup=await user_kb.cart_pay(total_amount, number_check, user_id))
+            else:
+                await bot.send_message(call.message.chat.id, "🛒 Корзина пуста", reply_markup=user_kb.kb_cart_shop)
+
+
+        elif call.data.startswith('additemin_'):
+            data = await state.get_data()
+            tips = data["tipst"]
+            geo = data["geo"]
+            count = data["count"]
+            await state.finish()
+            print(geo, count, tips)
+            async with db.DatabaseBot("Database/db.db") as db_bot:
+                if tips == '1':
+                    accounts = await db_bot.get_acc_less_than_4_hours(count, geo)
+                elif tips == '2':
+                    accounts = await db_bot.get_acc_between_4_and_12_hours(count, geo)
+                elif tips == '3':
+                    accounts = await db_bot.get_acc_min_24_max12(count, geo)
+                elif tips == '4':
+                    accounts = await db_bot.get_acc_between_24_and_36_hours(count, geo)
+                elif tips == '5':
+                    accounts = await db_bot.get_acc_greater_than_36_hours(count, geo)
+                account = accounts
+                price = await db_bot.get_price_country(geo)
+                print(price[0])
+                price_fin = int(count) * int(price[0])
+                print(call.message.chat.id, geo, accounts, count, price_fin)
+
+                async with db.DatabaseBot("Database/db.db") as db_bot:
+                    if isinstance(accounts, list):
+                        accounts = json.dumps(accounts)
+                    await db_bot.add_item(call.message.chat.id, geo, accounts, price_fin, count)
+                for entry in account:
+                    print("Удалён → " + entry)
+                    async with db.DatabaseBot("Database/db.db") as db_bot:
+                        await db_bot.delete_item_item(entry)
+            await bot.edit_message_text(f"Успешно добавлен в вашу корзину. ✔\n"
+                                        f"❗ Через 30 минут, ваша корзина будет очищена", call.message.chat.id,
+                                        call.message.message_id)
+    #    state = Dispatcher.get_current().current_state()
+
+'''count = message.text
     data = await state.get_data()
     await state.finish()
     dt = data["price"]
@@ -1088,7 +1212,7 @@ async def adm_states_input_geo_sum(message:types.Message,state = FSMContext):
     await bot.send_message(message.chat.id, text='Введите название для гео, можно использовать флаги стран', reply_markup=adm_kb.adm_menu_geo_back)
     await states.adm_states.input_new_geo_sum_new.set()
 
-@dp.callback_query_handler(lambda c: c.data.startswith('additemin'), state=states.user_states.new_acc_buy)
+'''@dp.callback_query_handler(lambda c: c.data.startswith('additemin'), state=states.user_states.new_acc_buy)
 async def handle_add_item(call: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     tips = data["tipst"]
@@ -1124,7 +1248,7 @@ async def handle_add_item(call: types.CallbackQuery, state: FSMContext):
     await bot.edit_message_text(f"Успешно добавлен в вашу корзину. ✔\n"
                                 f"❗ Через 30 минут, ваша корзина будет очищена", call.message.chat.id,
                                 call.message.message_id)
-
+'''
 
 @dp.message_handler(state=states.adm_states.input_new_geo_sum_new)
 async def adm_states_input_geo_sum(message:types.Message,state = FSMContext):

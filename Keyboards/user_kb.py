@@ -28,7 +28,7 @@ async def cart_pay(total_amount, number_check, user_id):
     e = InlineKeyboardButton(text = 'Оплатить💸', callback_data=f'bkt_{total_amount}_{number_check}_{user_id}')#callback_data=f'bk_{total_amount}_{number_check}_{user_id}')
     y = InlineKeyboardButton(text = 'Очистить корзину❌', callback_data='clearcart')
     # r = KeyboardButton(text = 'Купить номер')
-    t = InlineKeyboardButton(text = 'Назад', callback_data='show_shop')
+    t = InlineKeyboardButton(text = '🛒 Назад в магазин', callback_data='show_shop')
     kb.add(y,e)
     kb.add(t)
     return kb
@@ -74,7 +74,7 @@ async def profile_payments_kb(sum, com):
     q = InlineKeyboardButton(text = '🪙 USDT (CryptoBot)', callback_data=f'profile_pay_USDT_{sum}')
     w = InlineKeyboardButton(text = '⛏️ TRX (CryptoBot)', callback_data=f'profile_pay_TRX_{sum}')
     r = InlineKeyboardButton(text = '🔷 TON (CryptoBot)', callback_data=f'profile_pay_TON_{sum}')
-    t = InlineKeyboardButton(text = 'Назад',callback_data='balance_add')
+    t = InlineKeyboardButton(text = 'Назад',callback_data='cartback')
     kb.add(qw,q, w, r, t)
     return kb
 
@@ -90,11 +90,11 @@ async def time_otlega(geo, price ,c1,c2,c3,c4,c5):
     kb.add(back)
     return kb
 
-async def write_cart(geo, count, tips):
+async def write_cart(geo, count, tips,price):
     kb = InlineKeyboardMarkup(row_width=2)
-    qw = InlineKeyboardButton(text='🔙 Назад', callback_data=f'f')
+    qw = InlineKeyboardButton(text='🔙 Назад', callback_data=f'backaccbuy_{geo}_{price}')
     q = InlineKeyboardButton(text='В корзину', callback_data=f'additemin_{geo}_{count}_{tips}')
-    back = InlineKeyboardButton(text='❌ Отмена', callback_data=f'show_shop')
+    back = InlineKeyboardButton(text='❌ Отмена', callback_data=f'showshopp')
     kb.add(qw,q)
     kb.add(back)
     return kb
@@ -114,7 +114,7 @@ async def profile_buyments_kb(price, com, number_check, user_id, tips):
     q = InlineKeyboardButton(text = '🪙 USDT (CryptoBot)', callback_data=f'profile_buy_USDT_{price}_{number_check}_{user_id}_{tips}')
     w = InlineKeyboardButton(text = '⛏️ TRX (CryptoBot)', callback_data=f'profile_buy_TRX_{price}_{number_check}_{user_id}_{tips}')
     r = InlineKeyboardButton(text = '🔷 TON (CryptoBot)', callback_data=f'profile_buy_TON_{price}_{number_check}_{user_id}_{tips}')
-    t = InlineKeyboardButton(text = 'Назад',callback_data='balance_add')
+    t = InlineKeyboardButton(text = 'Назад',callback_data='show_shop')
     kb.add(qw,q, w, r, t)
     return kb
 

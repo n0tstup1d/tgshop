@@ -355,11 +355,57 @@ class DatabaseBot:
                 counts[interval[0]] = result[0]
         return counts
 
+    async def get_all_users(self):
+        async with self.lock:
+            async with self.db.execute('SELECT * FROM users') as cursor:
+                res = await cursor.fetchall()
+                return res
+
+    async def sum_last_24_hours(self):
+        now = datetime.now()
+        last_24_hours = now - timedelta(days=1)
+        async with self.lock:
+            cursor = await self.db.execute('''
+                SELECT SUM(price) FROM checks
+                WHERE date_create >= ?
+            ''', (last_24_hours.strftime('%Y-%m-%d %H:%M'),))
+            result = await cursor.fetchone()
+            return result[0] if result[0] is not None else 0.0
+
+    async def sum_last_week(self):
+        now = datetime.now()
+        last_week = now - timedelta(weeks=1)
+        async with self.lock:
+            cursor = await self.db.execute('''
+                SELECT SUM(price) FROM checks
+                WHERE date_create >= ?
+            ''', (last_week.strftime('%Y-%m-%d %H:%M'),))
+            result = await cursor.fetchone()
+            return result[0] if result[0] is not None else 0.0
+
+    async def sum_last_month(self):
+        now = datetime.now()
+        last_month = now - timedelta(days=30)
+        async with self.lock:
+            cursor = await self.db.execute('''
+                SELECT SUM(price) FROM checks
+                WHERE date_create >= ?
+            ''', (last_month.strftime('%Y-%m-%d %H:%M'),))
+            result = await cursor.fetchone()
+            return result[0] if result[0] is not None else 0.0
+
+
     async def get_old_items(self):
         async with self.lock:
             async with self.db.execute('''SELECT item FROM cart WHERE added_at < datetime('now', '-30 minutes')''') as cursor:
                 rows = await cursor.fetchall()
                 return [row[0] for row in rows]
+
+    async def get_counts_user(self):
+        async with self.lock:
+            async with self.db.execute('SELECT count(user_id) FROM users') as cursor:
+                res = await cursor.fetchone()
+                return res[0]
 
     async def delete_old_items(self):
         async with self.lock:
