@@ -379,8 +379,8 @@ async def call(call: CallbackQuery):
         message = (
             f"Регион: {geo}\nОтлежка: {otlega}\n\n"
             f"⬇️Укажите количество аккаунтов сообщением⬇️\n"
-            f"(просто отправьте цифру в чат)!\n\n"
-            #f"Если Вы ошиблись, цифру можно ввести повторно🔄\n\n"
+            f"<strong>(просто отправьте цифру в чат)!</strong>\n\n"
+            f"<u>Если Вы ошиблись, цифру можно ввести повторно🔄</u>\n\n"
             f"✅ Доступно к покупке: {counts_acc_time} шт.\n\n"
             f"🛒 Количество: {int(countuser)} шт. \n\n"
 
@@ -977,8 +977,6 @@ async def user_states_new_acc_buy(message: types.Message, state: FSMContext):
         geo = data["geo"]
         price = data["price"]
         message_i = data["message_id"]
-        await state.finish()
-
         if tips == '1':
             otlega = 'меньше 4ч'
         elif tips == '2':
@@ -989,19 +987,16 @@ async def user_states_new_acc_buy(message: types.Message, state: FSMContext):
             otlega = 'больше 24ч'
         elif tips == '5':
             otlega = 'больше 36ч'
-
         async with db.DatabaseBot("Database/db.db") as db_bot:
             count = await db_bot.get_count_geo(geo)
-
         response_message = (
             f"Регион: {geo}\nОтлежка: {otlega}\n\n"
-            #f"⬇️Укажите количество аккаунтов сообщением⬇️\n"
-            #f"(просто отправьте цифру в чат)!\n\n"
-            #f"Если Вы ошиблись, цифру можно ввести повторно🔄\n\n"
+            f"⬇️Укажите количество аккаунтов сообщением⬇️\n"
+            f"(просто отправьте цифру в чат)!\n\n"
+            f"<u>Если Вы ошиблись, цифру можно ввести повторно🔄</u>\n\n"
             f"✅ Доступно к покупке: {count} шт.\n\n"
             f"🛒 Количество: {int(countuser)} шт."
         )
-
         await bot.edit_message_text(text=response_message,chat_id=message.chat.id, message_id=message_i, reply_markup=await user_kb.write_cart(geo, int(countuser), int(tips), price))
         await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
         await states.user_states.new_acc_buy.set()
@@ -1009,8 +1004,6 @@ async def user_states_new_acc_buy(message: types.Message, state: FSMContext):
         await state.update_data(geo=geo)
         await state.update_data(tipst=tips)
         await state.update_data(count=countuser)
-    else:
-        await state.finish()
 
 @dp.callback_query_handler(state=states.user_states.new_acc_buy)
 async def user_states_new_acc_buy(call: CallbackQuery, state: FSMContext):
@@ -1239,7 +1232,7 @@ async def adm_states_input_acc_sum(message:types.Message,state = FSMContext):
 
 
 @dp.message_handler(state=states.adm_states.input_del_acc_sum)
-async def adm_states_input_acc_sum(message:types.Message,state = FSMContext):
+async def adm_states_input_acc_sum(message:types.Message,state=FSMContext):
     input_geo_sums_new = message.text
     await state.finish()
     print(input_geo_sums_new)
