@@ -11,6 +11,8 @@ class adm_states(StatesGroup):
     new_input_new_geo_sum_edit = State()
     mailing = State()
     input_del_geo_sum = State()
+    input_del_acc_sum = State()
+    input_del_acc = State()
 class user_states(StatesGroup):
     for_maill = State()
     new_balance = State()

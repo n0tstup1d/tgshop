@@ -47,7 +47,7 @@ async def cart_less_format(total_amount, number_check, user_id):
     qw = InlineKeyboardButton(text='1️⃣', callback_data=f'for_1_{total_amount}_{number_check}_{user_id}')#_{country}')
     q = InlineKeyboardButton(text='2️⃣', callback_data=f'for_2_{total_amount}_{number_check}_{user_id}')#_{country}')
     w = InlineKeyboardButton(text='️3️⃣', callback_data=f'for_3_{total_amount}_{number_check}_{user_id}')#_{country}')
-    r = InlineKeyboardButton(text='4️⃣', callback_data=f'for_3_{total_amount}_{number_check}_{user_id}')#_{country}')
+    r = InlineKeyboardButton(text='4️⃣', callback_data=f'for_4_{total_amount}_{number_check}_{user_id}')#_{country}')
     back = InlineKeyboardButton(text='Назад', callback_data=f'show_shop')
     kb.add(qw, q, w, r)
     kb.add(back)

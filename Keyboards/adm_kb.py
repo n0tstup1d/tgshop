@@ -34,6 +34,16 @@ cancel_adm_kb = InlineKeyboardMarkup(row_width=1)
 q = InlineKeyboardButton(text = 'Назад',callback_data='back')
 cancel_adm_kb.add(q)
 
+menu_delete_acc = InlineKeyboardMarkup(row_width=1)
+t = InlineKeyboardButton(text = 'Удалить все аккануты',callback_data='yes_or_no')
+q = InlineKeyboardButton(text = 'Удалить конкретное гео',callback_data='concretgeoacc')
+menu_delete_acc.add(t,q)
+
+yes_or_no_acc_del = InlineKeyboardMarkup(row_width=1)
+t = InlineKeyboardButton(text = '✔ да',callback_data='yes')
+q = InlineKeyboardButton(text = '⛔ нет',callback_data='menudeleteacc')
+yes_or_no_acc_del.add(t,q)
+
 cancel_adm_kb_mailingg = InlineKeyboardMarkup(row_width=1)
 q = InlineKeyboardButton(text = '🔙 Назад',callback_data='backmailing')
 cancel_adm_kb_mailingg.add(q)

@@ -268,20 +268,16 @@ async def call(call: CallbackQuery):
         await states.adm_states.get_sum_id.set()
     elif call.data == 'shopacc':
         message = 'Список существующих стран в магазине и их список:\n'
-        with open('accounts.txt', 'r') as file:
-            lines = file.readlines()
-        region_counts = {}
-        for line in lines:
-            region = line.split(':')[0]
-            if region in region_counts:
-                region_counts[region] += 1
-            else:
-                region_counts[region] = 1
-        for region, count in region_counts.items():
-            print(f"{region} | {count}")
-            message += f"{region} | {count}\n"
-        await bot.edit_message_text(message,call.message.chat.id, call.message.message_id,
-                                    reply_markup=adm_kb.adm_menu_acc_shop)
+        async with db.DatabaseBot("Database/db.db") as db_bot:
+            contrys = await db_bot.get_count_acc()
+        for value in contrys:
+            async with db.DatabaseBot("Database/db.db") as db_bot:
+                count = await db_bot.get_count_acc_sum(value[0])
+            print(f"{value[0]} | {count[0][0]}")
+            message += f"{value[0]} | {count[0][0]}\n"
+        await bot.edit_message_text(message, call.message.chat.id, call.message.message_id,
+                                reply_markup=adm_kb.adm_menu_acc_shop)
+
     elif call.data == 'SettingsGeo':
         async with db.DatabaseBot("Database/db.db") as db_bot:
             countries = await db_bot.get_countries_acc()
@@ -615,6 +611,33 @@ async def call(call: CallbackQuery):
                                     f'за неделю: {sum_week} ₽\n'
                                     f'за месяц: {sum_month} ₽\n',
                                     call.message.chat.id, call.message.message_id, reply_markup=adm_kb.cancel_adm_give_sum)
+
+
+    elif call.data.startswith('outtxt'):
+        await bot.edit_message_text('Введите гео аккаунтов которого желаете выгрузить', call.message.chat.id, call.message.message_id,
+                                    reply_markup=adm_kb.cancel_adm_kb)
+        await states.adm_states.input_del_acc_sum.set()
+
+    elif call.data.startswith('concretgeoacc'):
+        await bot.edit_message_text('Введите гео аккаунтов которое желаете удалить', call.message.chat.id, call.message.message_id,
+                                    reply_markup=adm_kb.cancel_adm_kb)
+        await states.adm_states.input_del_acc.set()
+
+    elif call.data.startswith('menudeleteacc'):
+        await bot.edit_message_text('Меню удаления', call.message.chat.id, call.message.message_id,
+                                    reply_markup=adm_kb.menu_delete_acc)
+
+    elif call.data.startswith('yes_or_no'):
+        await bot.edit_message_text('Вы уверены?', call.message.chat.id, call.message.message_id,
+                                    reply_markup=adm_kb.yes_or_no_acc_del)
+
+    elif call.data.startswith('yes'):
+        async with db.DatabaseBot("Database/db.db") as db_bot:
+            await db_bot.delete_all_accs()
+        await bot.edit_message_text('✔ Успешно удалено', call.message.chat.id, call.message.message_id)
+        time.sleep(3)
+        await bot.edit_message_text('Меню удаления', call.message.chat.id, call.message.message_id,
+                                    reply_markup=adm_kb.menu_delete_acc)
 
     elif call.data.startswith('prcheck_pay_'):
         try:
@@ -1132,8 +1155,6 @@ async def handle_docs(message: types.Message, state: FSMContext):
         lines = file_content.splitlines()
         non_empty_lines = [line for line in lines if line.strip() != ""]
         filtered_content = "\n".join(non_empty_lines)
-        with open('accounts.txt', 'a') as accounts_file:
-            accounts_file.write(filtered_content + '\n')
         for line in non_empty_lines:
             print(line)
             geo_acc = line.split(':')[0]
@@ -1147,7 +1168,7 @@ async def handle_docs(message: types.Message, state: FSMContext):
         with open(file_path, 'wb') as temp_file:
             temp_file.write(downloaded_file.getvalue())
         os.remove(file_path)
-        await message.reply("Файл обработан и его содержимое добавлено в accounts.txt.")
+        await message.reply("Файл обработан и его содержимое добавлено в БД")
         await state.finish()
     else:
         await message.reply("Пожалуйста, пришлите текстовый файл (формат .txt).")
@@ -1203,6 +1224,39 @@ async def adm_states_new_input_new_geo_sum(message: types.Message, state: FSMCon
     await bot.send_message(message.chat.id, text='Админ панель', reply_markup=adm_kb.adm_menu)
     '''
 
+
+@dp.message_handler(state=states.adm_states.input_del_acc)
+async def adm_states_input_acc_sum(message:types.Message,state = FSMContext):
+    input_geo_sums_new = message.text
+    await state.finish()
+    print(input_geo_sums_new)
+    async with db.DatabaseBot("Database/db.db") as db_bot:
+        await db_bot.delete_concret_accs(str(input_geo_sums_new))
+    await bot.send_message(text='✔ Успешно удалено', chat_id=message.chat.id)
+    time.sleep(3)
+    await bot.send_message(text='Меню удаления', chat_id=message.chat.id,
+                                reply_markup=adm_kb.menu_delete_acc)
+
+
+@dp.message_handler(state=states.adm_states.input_del_acc_sum)
+async def adm_states_input_acc_sum(message:types.Message,state = FSMContext):
+    input_geo_sums_new = message.text
+    await state.finish()
+    print(input_geo_sums_new)
+    async with db.DatabaseBot("Database/db.db") as db_bot:
+        ass = await db_bot.get_accounts_from(str(input_geo_sums_new))
+    print(52)
+    print(ass)
+    print(ass)
+    for value in ass:
+        print(value[0])
+        parts = value
+        file_path = f"Temp/giveacc/accaunt_vygruzka_{input_geo_sums_new}.txt"
+        with open(file_path, "a") as file:
+            file.write(f'{value[0]}\n')
+    await bot.send_document(message.chat.id,
+                            open(f'Temp/giveacc/accaunt_vygruzka_{input_geo_sums_new}.txt', 'rb'))
+    os.remove(f'Temp/giveacc/accaunt_vygruzka_{input_geo_sums_new}.txt')
 
 @dp.message_handler(state=states.adm_states.input_new_geo_sum)
 async def adm_states_input_geo_sum(message:types.Message,state = FSMContext):

@@ -394,6 +394,14 @@ class DatabaseBot:
             result = await cursor.fetchone()
             return result[0] if result[0] is not None else 0.0
 
+    async def get_accounts_from(self,geo):
+        async with self.lock:
+            cursor = await self.db.execute('''
+                SELECT accounts FROM accounts 
+                WHERE geo_acc = ?
+            ''',(geo,))
+            accounts = await cursor.fetchall()
+            return accounts
 
     async def get_old_items(self):
         async with self.lock:
@@ -410,6 +418,16 @@ class DatabaseBot:
     async def delete_old_items(self):
         async with self.lock:
             await self.db.execute('''DELETE FROM cart WHERE added_at < datetime('now', '-30 minutes')''')
+            await self.db.commit()
+
+    async def delete_concret_accs(self, geo):
+        async with self.lock:
+            await self.db.execute('''DELETE FROM accounts WHERE geo_acc = ?''',(geo,))
+            await self.db.commit()
+
+    async def delete_all_accs(self):
+        async with self.lock:
+            await self.db.execute('''DELETE FROM accounts''')
             await self.db.commit()
 
     async def del_geo_acc(self, phonk_id):
@@ -495,6 +513,18 @@ class DatabaseBot:
     async def get_countries_acc(self):
             async with self.lock:
                 async with self.db.execute('SELECT region, price, names FROM countries') as cursor:
+                    rows = await cursor.fetchall()
+            return rows
+
+    async def get_count_acc(self):
+            async with self.lock:
+                async with self.db.execute('SELECT region FROM countries') as cursor:
+                    rows = await cursor.fetchall()
+            return rows
+
+    async def get_count_acc_sum(self, geo):
+            async with self.lock:
+                async with self.db.execute('SELECT price FROM countries WHERE region = ?',(geo,)) as cursor:
                     rows = await cursor.fetchall()
             return rows
 
