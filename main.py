@@ -188,13 +188,12 @@ async def text(message:types.Message):
     if message.text == "ℹ️ Информация":
         await bot.send_message(message.chat.id,
                                                 "\n"
-                                                "Тут могут быть ссылки на чаты"
+                                                "Ссылка на чат - https://t.me/tiktoksoftikshopchat"
                                                 "\n"
                                                 "Возникли вопросы по работе магазина писать в тех. поддержку\n"
-                                                "Тех.поддержка: None\n"
+                                                "Тех.поддержка: @TikTokSoftik\n"
                                                 "\n"
-                                                "Если возникли проблемы с товаром магазина, писать админу"
-                                                "Связь с администратором: None\n")
+                                                "Если возникли проблемы с товаром магазина, писать админу\nСвязь с администратором: @TikTokSoftik\n")
     if message.text == "🗑 Корзина":
         print(message.from_user.id)
         async with db.DatabaseBot("Database/db.db") as db_bot:
@@ -951,16 +950,15 @@ async def call(call: CallbackQuery):
 async def adm_states_mailing(message:types.Message,state = FSMContext):
     text = message.text
     await state.finish()
-    if text.isalpha():
-        async with db.DatabaseBot("DataBase/db.db") as db_bot:
-            all_users = await db_bot.get_all_users()
-        for user in all_users:
-            try:
-                await bot.send_message(user[1],text = text)
-            except:
-                pass
-        await bot.send_message(message.chat.id,text = 'Рассылка завершена 💌')
-        await bot.send_message(message.chat.id,text = 'Админ панель',reply_markup=adm_kb.adm_menu)
+    async with db.DatabaseBot("DataBase/db.db") as db_bot:
+        all_users = await db_bot.get_all_users()
+    for user in all_users:
+        try:
+            await bot.send_message(user[1], text=text)
+        except:
+            pass
+    await bot.send_message(message.chat.id, text='Рассылка завершена 💌')
+    await bot.send_message(message.chat.id, text='Админ панель', reply_markup=adm_kb.adm_menu)
 @dp.callback_query_handler(state=states.adm_states.mailing)
 async def adm_states_mailing(call: CallbackQuery, state=FSMContext):
     await state.finish()

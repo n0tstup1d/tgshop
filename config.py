@@ -1,7 +1,7 @@
 #bot_token = '1791116908:AAFHeM9y9_NXDJptzmEbOOREsV4WA7txYbg' # для тестов
 # bot_token = '6829339715:AAGuq1Z7XyEffqUMskiVBye81EK-u81lLEk'
 # bot_token = '7368128607:AAEAEWh68Vu1KIG2EKYMEXxBwfYQ8VkXCrE' german test
-bot_token = '7368128607:AAEAEWh68Vu1KIG2EKYMEXxBwfYQ8VkXCrE'
+bot_token = '7431561155:AAGMgE8ZEYjLA62YfYUdsSi6Irt2QPoOARk'
 
 id_adm = [5116994352,646534367,6712419902,6864888389,6712419902,7322876281,2069495261,646534367]
 
@@ -11,7 +11,7 @@ crypto_token = '241651:AAV5LTi9Z478MgSrw89Y07rVSHmkJ4agsW0'
 
 payment_channel = 5116994352
 
-bot_name = 'SoftikUBT_BOT'
+bot_name = 'TikTokSoftikShop'
 
 api_key = 'c7fad1fc7f1b4d8fbeb7c353924533f5'
 
