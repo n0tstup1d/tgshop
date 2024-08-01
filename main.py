@@ -68,31 +68,28 @@ async def delete_old_items_periodically():
                     print(tt[0])
                     geo = tt[0]
                     async with db.DatabaseBot("Database/db.db") as db_bot:
-                        await db_bot.insert_account(geo, value)
-
+                        date = await db_bot.select_temp_accounts(value)
+                    print(date)
+                    async with db.DatabaseBot("Database/db.db") as db_bot:
+                        await db_bot.insert_account_old(geo, value, date[0])
+                    async with db.DatabaseBot("Database/db.db") as db_bot:
+                        await db_bot.delete_temp_accs(value)
                 async with db.DatabaseBot("Database/db.db") as db_bot:
                     await db_bot.delete_old_items()
             else:
                 print('Корзины пусты')
         print(f"Очистка корзины окончена в {datetime.today()}")
-        await asyncio.sleep(120)  # Ожидаем 30 минут
+        await asyncio.sleep(120)
 
 def extract_accounts(country_code, count):
     tag = count
     with open('accounts.txt', 'r') as file:
         lines = file.readlines()
-
-    # Отфильтровать строки по тегу
     extracted_lines = [line for line in lines if line.startswith(tag)]
     count = int(count)
-
-    # Выбрать только необходимые строки для удаления
     to_remove = extracted_lines[:count]
-
-    # Удалить выбранные строки из списка всех строк
     remaining_lines = []
     removed_count = 0
-
     for line in lines:
         if line.startswith(tag) and removed_count < count:
             removed_count += 1
@@ -463,7 +460,11 @@ async def call(call: CallbackQuery):
                 geo = tt[0]
                 print(geo)
                 async with db.DatabaseBot("Database/db.db") as db_bot:
-                    await db_bot.insert_account(geo,lines[t])
+                    date_acc = await db_bot.select_temp_accounts(lines[t])
+                async with db.DatabaseBot("Database/db.db") as db_bot:
+                    await db_bot.insert_account(geo,lines[t], date_acc[0])
+                async with db.DatabaseBot("Database/db.db") as db_bot:
+                    await db_bot.delete_temp_accs(lines[t])
                 t += 1
         async with db.DatabaseBot("Database/db.db") as db_bot:
             await db_bot.delete_item(call.message.chat.id)
@@ -543,17 +544,25 @@ async def call(call: CallbackQuery):
                 cleanedd_string = "\n".join([line.strip() for line in cleaned_string.splitlines() if line.strip()])
                 print(cleanedd_string)
 
-                cleanedt_text = cleanedd_string.strip('"')
+                cleaned_text = cleanedd_string.strip('"')
 
                 # Replace comma and space with a newline character
-                cleaneds_text = cleanedt_text.replace('", "', '\n')
+                cleaneds_text = cleaned_text.replace('", "', '\n')
                 rand = random.randint(1, 999999999999999)
                 lines = cleaneds_text.split('\n')
                 t = 0
+
                 for value in lines:
+                    if not value.strip():  # Skip empty lines
+                        continue
                     print(lines[t])
                     parts = lines[t]
                     tt = parts.split(':')
+                    if len(tt) < 5:  # Ensure there are enough parts
+                        print(f"Skipping line due to insufficient parts: {lines[t]}")
+                        t += 1
+                        continue
+
                     geo = tt[0]
                     user = tt[1]
                     pass_tt = tt[2]
@@ -571,15 +580,25 @@ async def call(call: CallbackQuery):
                         text_file = f"{geo}:@{user}:{pass_tt}:{mail}:{pass_mail}\n"
                     print(text_file)
                     print(f'{t}+{lines[t]}')
-                    file_path = f"Temp/giveacc/zakaz_{call.message.chat.id}_{rand}_{idx}.txt"
+                    file_path = f"Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt"
                     with open(file_path, "a") as file:
                         file.write(text_file)
                     t += 1
 
+                # Ensure there are enough lines before accessing the third line
+                if len(lines) > 2:
+                    third_line = lines[2]
+                    print(third_line)
+                else:
+                    print("Not enough lines to get the third line.")
+
+                # Print the result
+                print(cleaneds_text)
+
                 await bot.send_document(call.message.chat.id,
-                                        open(f'Temp/giveacc/zakaz_{call.message.chat.id}_{rand}_{idx}.txt', 'rb'))
+                                        open(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt', 'rb'))
                 strc += cleaned_string
-                os.remove(f'Temp/giveacc/zakaz_{call.message.chat.id}_{rand}_{idx}.txt')
+                os.remove(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt')
 
             async with db.DatabaseBot("Database/db.db") as db_bot:
                 itemss = await db_bot.sum_count_acc(call.message.chat.id)
@@ -697,17 +716,25 @@ async def call(call: CallbackQuery):
                     cleanedd_string = "\n".join([line.strip() for line in cleaned_string.splitlines() if line.strip()])
                     print(cleanedd_string)
 
-                    cleanedt_text = cleanedd_string.strip('"')
+                    cleaned_text = cleanedd_string.strip('"')
 
                     # Replace comma and space with a newline character
-                    cleaneds_text = cleanedt_text.replace('", "', '\n')
+                    cleaneds_text = cleaned_text.replace('", "', '\n')
                     rand = random.randint(1, 999999999999999)
                     lines = cleaneds_text.split('\n')
                     t = 0
+
                     for value in lines:
+                        if not value.strip():  # Skip empty lines
+                            continue
                         print(lines[t])
                         parts = lines[t]
                         tt = parts.split(':')
+                        if len(tt) < 5:  # Ensure there are enough parts
+                            print(f"Skipping line due to insufficient parts: {lines[t]}")
+                            t += 1
+                            continue
+
                         geo = tt[0]
                         user = tt[1]
                         pass_tt = tt[2]
@@ -729,17 +756,19 @@ async def call(call: CallbackQuery):
                         with open(file_path, "a") as file:
                             file.write(text_file)
                         t += 1
-                    # Get the third line (index 2)
-                    third_line = lines[2]
 
-                    # Print the third line
-                    print(third_line)
+                    # Ensure there are enough lines before accessing the third line
+                    if len(lines) > 2:
+                        third_line = lines[2]
+                        print(third_line)
+                    else:
+                        print("Not enough lines to get the third line.")
 
                     # Print the result
                     print(cleaneds_text)
 
-
-                    await bot.send_document(call.message.chat.id, open(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt', 'rb'))
+                    await bot.send_document(call.message.chat.id,
+                                            open(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt', 'rb'))
                     strc += cleaned_string
                     os.remove(f'Temp/giveacc/out_{call.message.chat.id}_{rand}_{idx}.txt')
 
@@ -1003,6 +1032,13 @@ async def user_states_new_acc_buy(message: types.Message, state: FSMContext):
         await state.update_data(tipst=tips)
         await state.update_data(count=countuser)
 
+@dp.callback_query_handler(state=states.adm_states.get_shop_acc)
+async def handle_docs(call: CallbackQuery, state: FSMContext):
+    if call.data.startswith('back_adm_panel'):
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                    text='Админ панель', reply_markup=adm_kb.adm_menu)
+
+
 @dp.callback_query_handler(state=states.user_states.new_acc_buy)
 async def user_states_new_acc_buy(call: CallbackQuery, state: FSMContext):
         if call.data.startswith('backaccbuy_'):
@@ -1026,6 +1062,7 @@ async def user_states_new_acc_buy(call: CallbackQuery, state: FSMContext):
             await bot.edit_message_text(message, call.message.chat.id, call.message.message_id,
                                         reply_markup=await user_kb.time_otlega(geo, price, c1, c2, c3, c4, c5))
         elif call.data.startswith('showshopp'):
+            await state.finish()
             await bot.edit_message_text(f"---------------- В наличии ----------------\n", call.message.chat.id,
                                         call.message.message_id,
                                         reply_markup=await user_kb.shop_menu_acc())
@@ -1094,7 +1131,26 @@ async def user_states_new_acc_buy(call: CallbackQuery, state: FSMContext):
                     if isinstance(accounts, list):
                         accounts = json.dumps(accounts)
                     await db_bot.add_item(call.message.chat.id, geo, accounts, price_fin, count)
+
                 for entry in account:
+                    print(entry)
+                    print(5252)
+                    print(entry)
+                    async with db.DatabaseBot("Database/db.db") as db_bot:
+                        date_acc = await db_bot.select_date_acc(entry)
+                        print(date_acc[0])
+                    async with db.DatabaseBot("Database/db.db") as db_bot:
+                        await db_bot.insert_temp_accounts(entry,date_acc[0])
+
+                for entry in account:
+                    '''print(entry)
+                    print(5252)
+                    print(entry[0])
+                    async with db.DatabaseBot("Database/db.db") as db_bot:
+                        date_acc = await db_bot.select_date_acc(entry)
+                        print(date_acc)
+                    async with db.DatabaseBot("Database/db.db") as db_bot:
+                        await db_bot.insert_temp_accounts(entry,date_acc)'''
                     print("Удалён → " + entry)
                     async with db.DatabaseBot("Database/db.db") as db_bot:
                         await db_bot.delete_item_item(entry)

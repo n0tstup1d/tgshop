@@ -145,17 +145,26 @@ async def shop_menu_acc():
                     country_count[country_code] += 1
                 else:
                     country_count[country_code] = 1
+
     async with db.DatabaseBot("DataBase/db.db") as db_bot:
         couns = await db_bot.get_countries_acc()
+
     country_rr_map = {row[0]: row[1] for row in couns}
+
     for country, count in country_count.items():
         if country in country_rr_map:
             rr = country_rr_map[country]
-            print(country)
+
             async with db.DatabaseBot("DataBase/db.db") as db_bot:
                 counss = await db_bot.get_count_geo(country)
-            async with db.DatabaseBot("DataBase/db.db") as db_bot:
-                couns = await db_bot.get_names_countries_acc(country)
-            q = InlineKeyboardButton(text=f'{couns} | {counss} шт.| {rr} ₽', callback_data=f'accbuy_{country}_{rr}')
-            kb.add(q)
+                names_countries_acc = await db_bot.get_names_countries_acc(country)
+
+            # Проверяем, что counss больше нуля
+            if counss > 0:
+                q = InlineKeyboardButton(
+                    text=f'{names_countries_acc} | {counss} шт.| {rr} ₽',
+                    callback_data=f'accbuy_{country}_{rr}'
+                )
+                kb.add(q)
+
     return kb
