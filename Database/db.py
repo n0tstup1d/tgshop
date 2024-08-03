@@ -96,6 +96,18 @@ class DatabaseBot:
                     res = await cursor.fetchone()
                     return bool(res)
 
+    async def check_accounts_for_cookie_true(self, user_id):
+            async with self.lock:
+                async with self.db.execute('SELECT accounts FROM accounts WHERE accounts LIKE ?', (f'%{user_id}%',)) as cursor:
+                    res = await cursor.fetchone()
+                    return bool(res)
+
+    async def check_accounts_for_cookie(self, user_id):
+            async with self.lock:
+                async with self.db.execute('SELECT accounts FROM accounts WHERE accounts LIKE ?', (f'%{user_id}%',)) as cursor:
+                    res = await cursor.fetchone()
+                    return res
+
     async def check_users_sub(self, user_id):
             async with self.lock:
                 async with self.db.execute('SELECT sub_date FROM users WHERE user_id = ?', (user_id,)) as cursor:
@@ -423,6 +435,24 @@ class DatabaseBot:
                 rows = await cursor.fetchall()
                 return [row[0] for row in rows]
 
+    '''async def get_date_cookie_accounts(self, cookie):
+        async with self.lock:
+            async with self.db.execute(''SELECT cookie_accs FROM accounts WHERE accounts = ?'',(cookie,)) as cursor:
+                rows = await cursor.fetchall()
+                return [row[0] for row in rows]
+    '''
+    async def get_cookie_accounts(self, cookie):
+        async with self.lock:
+            async with self.db.execute('''SELECT cookie_accs FROM accounts WHERE accounts = ?''',(cookie,)) as cursor:
+                rows = await cursor.fetchall()
+                return [row[0] for row in rows]
+
+    async def get_all_accounts(self):
+        async with self.lock:
+            async with self.db.execute('''SELECT accounts FROM accounts WHERE date_cookie < datetime('now', '-480 minutes')''') as cursor:
+                rows = await cursor.fetchall()
+                return [row[0] for row in rows]
+
     async def get_counts_user(self):
         async with self.lock:
             async with self.db.execute('SELECT count(user_id) FROM users') as cursor:
@@ -437,6 +467,11 @@ class DatabaseBot:
     async def delete_concret_accs(self, geo):
         async with self.lock:
             await self.db.execute('''DELETE FROM accounts WHERE geo_acc = ?''',(geo,))
+            await self.db.commit()
+
+    async def delete_account_cookie(self, geo):
+        async with self.lock:
+            await self.db.execute('''DELETE FROM accounts WHERE accounts = ?''',(geo,))
             await self.db.commit()
 
     async def delete_temp_accs(self, geo):
@@ -497,13 +532,46 @@ class DatabaseBot:
             ''', (date_purchase, sum_purchase))
             await self.db.commit()
 
+    async def insert_trash_accs(self, sum_purchase):
+        async with self.lock:
+            await self.db.execute('''
+                INSERT INTO trash_accs_cookie (trash_accs)
+                VALUES (?)
+            ''', (sum_purchase))
+            await self.db.commit()
+
     async def insert_check(self, sum_purchase, number_check, user_id, string):
         date_purchase = datetime.now().strftime('%Y-%m-%d %H:%M')  # Форматирование даты до минуты
         async with self.lock:
             await self.db.execute('INSERT INTO checks (number_check, user_id, date_create, price, items) VALUES (?, ?, ?, ?, ?) ', (number_check, user_id, date_purchase, sum_purchase, string))
             await self.db.commit()
 
-    async def insert_account(self, geo_acc, accounts, date_purchase):  # Форматирование даты до минуты
+    async def insert_account(self, geo_acc, accounts):  # Форматирование даты до минуты
+        date_purchase = datetime.now().strftime('%Y-%m-%d %H:%M')
+        async with self.lock:
+            await self.db.execute('INSERT INTO accounts (geo_acc, accounts, date_add) VALUES (?, ?, ?) ', (geo_acc, accounts, date_purchase))
+            await self.db.commit()
+
+    async def insert_account_cookie(self, account,geo_acc):  # Форматирование даты до минуты
+        date_purchase = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+        async with self.lock:
+            await self.db.execute(
+                'UPDATE accounts SET cookie_accs = ?, date_cookie = ? WHERE accounts = ?',
+                (geo_acc, date_purchase, account)
+            )
+            await self.db.commit()
+
+    async def update_account_cookie(self, account):  # Форматирование даты до минуты
+        date_purchase = datetime.now().strftime('%Y-%m-%d %H:%M')
+        async with self.lock:
+            await self.db.execute(
+                'UPDATE accounts SET date_cookie = ? WHERE accounts = ?',
+                (date_purchase, account,)
+            )
+            await self.db.commit()
+
+    async def insert_accounts(self, geo_acc, accounts, date_purchase):  # Форматирование даты до минуты
         async with self.lock:
             await self.db.execute('INSERT INTO accounts (geo_acc, accounts, date_add) VALUES (?, ?, ?) ', (geo_acc, accounts, date_purchase))
             await self.db.commit()

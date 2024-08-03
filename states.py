@@ -4,6 +4,8 @@ class adm_states(StatesGroup):
     get_sum_id = State()
     new_give_money = State()
     get_shop_acc = State()
+    get_proxy_cookie = State()
+    get_shop_cookie = State()
     input_new_geo_sum = State()
     input_new_geo_sum_new = State()
     input_new_geo_sum_for_edit = State()

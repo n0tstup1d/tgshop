@@ -55,6 +55,18 @@ t = InlineKeyboardButton(text=f'Удалить гео', callback_data=f'delGEO')
 tt = InlineKeyboardButton(text=f'Назад', callback_data=f'back_adm_panel')
 adm_add_geo.add(w,r,t,tt)
 
+adm_add_acc_menu = InlineKeyboardMarkup(row_width=1)
+w = InlineKeyboardButton(text=f'Залить аккаунты 👥', callback_data=f'addnewacc')
+r = InlineKeyboardButton(text=f'Залить куки 🍪', callback_data=f'addnewcookie')
+t = InlineKeyboardButton(text = 'Назад',callback_data='back_adm_panel')
+adm_add_acc_menu.add(w,r,t)
+
+adm_edit_acc_menu = InlineKeyboardMarkup(row_width=1)
+w = InlineKeyboardButton(text=f'Добавить прокси для куки', callback_data=f'addnewproxy')
+#r = InlineKeyboardButton(text=f'Залить куки 🍪', callback_data=f'addnewcookie')
+t = InlineKeyboardButton(text = 'Назад',callback_data='back_adm_panel')
+adm_edit_acc_menu.add(w,t)
+
 adm_menu_geo_back = InlineKeyboardMarkup(row_width=1)
 # q = InlineKeyboardButton(text = 'Управление устройствами',callback_data='settings_phone')
 backs = InlineKeyboardButton(text = 'Назад',callback_data='back_adm_panel')

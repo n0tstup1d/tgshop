@@ -11,7 +11,12 @@ from LOLZTEAM.Utils import CheckPayment
 from LOLZTEAM.API import Market
 from config import token_lolz
 import string
+import tiktok.cbac as cbac
 import json
+import zipfile
+import rarfile
+import json
+from io import BytesIO
 import requests
 from aiogram.utils import markdown as md
 import openpyxl
@@ -79,6 +84,19 @@ async def delete_old_items_periodically():
             else:
                 print('Корзины пусты')
         print(f"Очистка корзины окончена в {datetime.today()}")
+
+        print("Взаимодействие с куки, начало....")
+        async with db.DatabaseBot("Database/db.db") as db_bot:
+            res = await db_bot.get_all_accounts()
+        for value in res:
+            print(value)
+            async with db.DatabaseBot("Database/db.db") as db_bot:
+                rest = await db_bot.get_cookie_accounts(value)
+            print(rest[0])
+            restt = rest[0]
+            await cbac.start_work(value)
+        print('Конец взаимодействия с куки')
+
         await asyncio.sleep(120)
 
 def extract_accounts(country_code, count):
@@ -345,8 +363,28 @@ async def call(call: CallbackQuery):
 
 
     elif call.data == 'menuaddaccshop':
-        await bot.edit_message_text('Скиньте файл (.txt) с аккаунтами (можно с разными гео)', call.message.chat.id, call.message.message_id ,reply_markup=adm_kb.adm_menu_geo_back)
+        await bot.edit_message_text('Выберите что желаете добавить', call.message.chat.id,
+                                    call.message.message_id, reply_markup=adm_kb.adm_add_acc_menu)
+
+    elif call.data == 'menueditacc':
+        await bot.edit_message_text('Меню управления', call.message.chat.id,
+                                    call.message.message_id, reply_markup=adm_kb.adm_edit_acc_menu)
+
+
+    elif call.data == 'addnewcookie':
+        await bot.edit_message_text('Скиньте архив с куки, аккаунтов, добавленные ранее', call.message.chat.id,
+                                    call.message.message_id, reply_markup=adm_kb.adm_menu_geo_back)
+        await states.adm_states.get_shop_cookie.set()
+
+    elif call.data == 'addnewacc':
+        await bot.edit_message_text('Скиньте файл (.txt) с аккаунтами (можно с разными гео)', call.message.chat.id,
+                                    call.message.message_id, reply_markup=adm_kb.adm_menu_geo_back)
         await states.adm_states.get_shop_acc.set()
+
+    elif call.data == 'addnewproxy':
+        await bot.edit_message_text('Скиньте файл (.txt) с прокси', call.message.chat.id,
+                                    call.message.message_id, reply_markup=adm_kb.adm_menu_geo_back)
+        await states.adm_states.get_proxy_cookie.set()
 
     elif call.data == 'balance_add':
         await bot.edit_message_text('Введите сумму для пополнения в ₽',call.message.chat.id,call.message.message_id,reply_markup=adm_kb.cancel_adm_kb)
@@ -462,7 +500,7 @@ async def call(call: CallbackQuery):
                 async with db.DatabaseBot("Database/db.db") as db_bot:
                     date_acc = await db_bot.select_temp_accounts(lines[t])
                 async with db.DatabaseBot("Database/db.db") as db_bot:
-                    await db_bot.insert_account(geo,lines[t], date_acc[0])
+                    await db_bot.insert_accounts(geo,lines[t], date_acc[0])
                 async with db.DatabaseBot("Database/db.db") as db_bot:
                     await db_bot.delete_temp_accs(lines[t])
                 t += 1
@@ -488,14 +526,14 @@ async def call(call: CallbackQuery):
         qq = InlineKeyboardButton(text='Проверить оплату', callback_data=f'check_lolzbuy_{rubles}_{com}_{num_check}_{user_id}_{tips}')
         w = InlineKeyboardButton(text='Отменить', callback_data=f'cancel_order')
         kb.add(q,qq,w)
-        await bot.edit_message_text(f'🆙 Пополнение баланса\n'
+        await bot.edit_message_text(f'🆙 Оплата\n'
                                     f'➖➖➖➖➖➖➖➖➖➖➖➖➖\n'
-                                    f'🤖 Для пополнения баланса, нажмите на кнопку ниже.\n'
+                                    f'🤖 Для оплатч, нажмите на кнопку ниже.\n'
                                     f'➖➖➖➖➖➖➖➖➖➖➖➖➖\n'
                                     f'❗Не изменять коммент❗\n'
                                     f'‼После оплаты, обязательно нажмите проверить оплату‼\n' #https://lzt.market/balance/transfer?username=ChivapChiCH&hold=0&amount=7&comment=1719910189.48956_cf0496c474
                                     '➖➖➖➖➖➖➖➖➖➖➖➖➖\n'
-                                    f'💰 Сумма пополнения: {suma} ₽\n'
+                                    f'💰 Сумма платежа: {suma} ₽\n'
                                     '➖➖➖➖➖➖➖➖➖➖➖➖➖\n',
                                     call.message.chat.id, call.message.message_id, reply_markup=kb)
     elif call.data == 'cancel_order':
@@ -1035,6 +1073,14 @@ async def user_states_new_acc_buy(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(state=states.adm_states.get_shop_acc)
 async def handle_docs(call: CallbackQuery, state: FSMContext):
     if call.data.startswith('back_adm_panel'):
+        await state.finish()
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                    text='Админ панель', reply_markup=adm_kb.adm_menu)
+
+@dp.callback_query_handler(state=states.adm_states.get_proxy_cookie)
+async def handle_docs(call: CallbackQuery, state: FSMContext):
+    if call.data.startswith('back_adm_panel'):
+        await state.finish()
         await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                     text='Админ панель', reply_markup=adm_kb.adm_menu)
 
@@ -1190,6 +1236,28 @@ async def user_states_new_balance(message: types.Message, state=FSMContext):
     ran = f"{com}_{random_string(30)}"
     await state.finish()
     await bot.send_message(message.chat.id, text='Выберите чем желаете пополнить', reply_markup= await user_kb.profile_payments_kb(amount, ran))
+
+
+@dp.message_handler(content_types=types.ContentType.DOCUMENT, state=states.adm_states.get_proxy_cookie)
+async def handle_docs(message: types.Message, state: FSMContext):
+    document = message.document
+    if document.mime_type == 'text/plain':
+        file_info = await bot.get_file(document.file_id)
+        downloaded_file = await bot.download_file(file_info.file_path)
+        file_content = downloaded_file.read().decode('utf-8')
+        lines = file_content.splitlines()
+        non_empty_lines = [line for line in lines if line.strip() != ""]
+        filtered_content = "\n".join(non_empty_lines)
+        file_path = 'proxy.txt'
+
+        # Открываем файл в режиме добавления ('a') и записываем в него отфильтрованное содержимое
+        with open(file_path, 'a') as temp_file:
+            temp_file.write(filtered_content + '\n')
+
+        await message.reply(f"Файл обработан и его содержимое добавлено в {file_path}")
+        await state.finish()
+    else:
+        await message.reply("Пожалуйста, пришлите текстовый файл (формат .txt).")
 
 
 @dp.message_handler(content_types=types.ContentType.DOCUMENT, state=states.adm_states.get_shop_acc)
@@ -1350,6 +1418,116 @@ async def handle_add_item(call: types.CallbackQuery, state: FSMContext):
                                 f"❗ Через 30 минут, ваша корзина будет очищена", call.message.chat.id,
                                 call.message.message_id)
 '''
+
+@dp.message_handler(state=states.adm_states.get_shop_cookie, content_types=types.ContentType.DOCUMENT)
+async def user_states_cookie(message: types.Message, state: FSMContext):
+    document = message.document
+    await bot.send_message(message.chat.id, text='Начинаю загрузку')
+    await state.finish()
+
+    file = await bot.download_file_by_id(document.file_id)
+    file_bytes = BytesIO(file.getvalue())
+
+    archive_extension = document.file_name.split(".")[-1].lower()
+
+    extract_to = 'emp'
+    os.makedirs(extract_to, exist_ok=True)
+
+    if archive_extension == 'zip':
+        with zipfile.ZipFile(file_bytes, 'r') as archive:
+            for file_info in archive.infolist():
+                # Получаем имя файла без директорий
+                file_name = os.path.basename(file_info.filename)
+
+                # Путь для сохранения файла в папке 'emp'
+                file_path = os.path.join(extract_to, file_name)
+
+                if file_info.is_dir():
+                    # Если это директория, создаем её в 'emp', если нужно
+                    os.makedirs(file_path, exist_ok=True)
+                else:
+                    # Если это файл, извлекаем его в 'emp'
+                    with archive.open(file_info) as file:
+                        with open(file_path, 'wb') as output_file:
+                            output_file.write(file.read())
+
+                print(f"Файл: {file_info.filename}")
+                email = file_name.split('.')[0]
+                print(email)
+
+                async with db.DatabaseBot("Database/db.db") as db_bot:
+                    user_info = await db_bot.check_accounts_for_cookie_true(email)
+                print(user_info)
+
+                if user_info:
+                    if file_name.endswith('.json'):
+                        async with db.DatabaseBot("Database/db.db") as db_bot:
+                            user_info_acc = await db_bot.check_accounts_for_cookie(email)
+                        print(user_info_acc[0])
+
+                        # Читаем содержимое JSON файла из папки 'emp'
+                        json_file_path = os.path.join(extract_to, file_name)
+                        with open(json_file_path, 'r') as json_file:
+                            content = json.load(json_file)
+                        print(str(content))
+
+                        async with db.DatabaseBot("Database/db.db") as db_bot:
+                            await db_bot.insert_account_cookie(user_info_acc[0], str(content))
+                        print("ok")
+                else:
+                    await bot.send_message(message.chat.id, text=f'Аккаунта {email}, отсутствует в БД')
+    elif archive_extension == 'rar':
+        with rarfile.RarFile(file_bytes) as archive:
+            for file_info in archive.infolist():
+                with archive.open(file_info) as file:
+                    print(f"Файл: {file_info.filename}")
+                    file_name = file_info.filename
+                    email = file_name.split('/')[-1].split('.')[0]
+                    print(email)
+                    if file_info.filename.endswith('.json'):
+                        content = json.load(file)
+                        print(content)
+    else:
+        print(f"Неподдерживаемый формат архива: {archive_extension}")
+        ''' try:
+            await document.download(destination_file=archive_path, timeout=500)
+        except asyncio.TimeoutError:
+            await bot.send_message(message.chat.id, text='Произошла ошибка при загрузке архива. Попробуйте отправить архив еще раз.')
+            return
+        extract_path = os.path.join('videos', f'{name_archive}')
+        os.makedirs(extract_path, exist_ok=True)
+        try:
+            if archive_path.endswith('.zip'):
+                with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                    zip_ref.extractall(extract_path)
+            elif archive_path.endswith('.rar'):
+                with rarfile.RarFile(archive_path, 'r') as rar_ref:
+                    rar_ref.extractall(extract_path)
+            else:
+                await bot.send_message(message.chat.id, text='Поддерживаются только ZIP и RAR архивы.')
+                return
+        except (zipfile.BadZipFile, rarfile.BadRarFile):
+            await bot.send_message(message.chat.id, text='Произошла ошибка при распаковке архива. Убедитесь, что вы отправили корректный ZIP или RAR файл.')
+            return
+    
+        video_files = [f for f in os.listdir(extract_path) if f.endswith(('.mp4', '.mov', '.avi'))]
+    
+        if not video_files:
+            await bot.send_message(message.chat.id, text='Архив не содержит видеофайлов или они имеют неподдерживаемый формат.')
+            return
+    
+        async with db.DatabaseBot("DataBase/bd.db") as db_bot:
+            for video_file in video_files:
+                name_video = random.randint(999, 99999999)
+                os.rename(os.path.join(extract_path, video_file), os.path.join('videos', f'{name_video}.mp4'))
+                await db_bot.insert_user_videos(message.from_user.id, name_video)
+    
+        # Удаляем архив после успешной распаковки
+        os.remove(archive_path)
+    '''
+    await bot.send_message(message.chat.id, text='Загружено ✔')
+#    await bot.send_message(message.chat.id, text='Выберите нужные настройки', reply_markup=user_kb.config_settings)
+
 
 @dp.message_handler(state=states.adm_states.input_new_geo_sum_new)
 async def adm_states_input_geo_sum(message:types.Message,state = FSMContext):
