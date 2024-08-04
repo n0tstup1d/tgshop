@@ -45,84 +45,92 @@ def get_proxy():
             f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=646534367&text=Ошибка чтения из файла прокси')
         return None
 
-
-async def start_work(account):
-    #database_bot = asyncio.run(init_db())
-    proxy = "ibq2wkcvuc-res-country-UA-hold-query-session-66a327f104f34:0RJvvb5vi2TfGonp|http://api.asocks.com/user/port/refresh/ip/b597ebcf-4b08-11ef-b924-bc24114c89e8@93.190.138.107:9999"
+def start_work(account):
+    database_bot = asyncio.run(init_db())
     print(account)
     accounts = account.split(':')
     geo_acc = accounts[0]
     login_acc = accounts[1]
     version = "34.9.3"
-    print(login_acc)
-    with open(f'emp/{login_acc}.json', 'r') as file:
-        data = json.load(file)
+    while True:
+        print(login_acc)
+        with open(f'emp/{login_acc}.json', 'r') as file:
+            data = json.load(file)
 
-    device = data.get("device")
-    cookie = data.get("cookie")
+        device = data.get("device")
+        cookie = data.get("cookie")
 
-    proxy, refresh_link = next(get_proxy())
+        proxy, refresh_link = next(get_proxy())
 
-    print(proxy)
-    date_purchase = datetime.now().strftime('%Y-%m-%d %H:%M')
-    print(device)
-    print(cookie)
-    url = f"https://api.tokapi.online/v1/user/self?app_version={version}"
-    get_headers = {
-        "accept": "application/json",
-        "x-api-key": f"{api_key}",
-        "x-proxy": f"{proxy}",
-        "x-device": f"{device}",
-        "x-cookie": f"{cookie}",
-        "x-project-name": 'tokapi'
-    }
-    response = requests.get(url, headers=get_headers)
+        print(proxy)
 
-    if response.status_code == 200:
-        print(response.text)
-        data = json.loads(response.text)
-        user_id_acc = data['user']['uid']
-
-    else:
-        print(f"Нет доступа к аккаунту {response.text}")
-        async with db.DatabaseBot("Database/db.db") as db_bot:
-            await db_bot.insert_trash_accs(account)
-        async with db.DatabaseBot("Database/db.db") as db_bot:
-            await db_bot.delete_account_cookie(account)
-        requests.get(
-            f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=646534367&text= Удалено из БД аккаунт {account}')
-
-
-    url = f"https://api.tokapi.online/v1/user/{user_id_acc}/profile?app_version={version}"
-
-    payload = {
-        "profile": {
-            "signature": f"{str(date_purchase)}"
+        print(proxy)
+        date_purchase = datetime.now().strftime('%Y-%m-%d %H:%M')
+        print(device)
+        print(cookie)
+        url = f"https://api.tokapi.online/v1/user/self?app_version={version}"
+        get_headers = {
+            "accept": "application/json",
+            "x-api-key": f"{api_key}",
+            "x-proxy": f"{proxy}",
+            "x-device": f"{device}",
+            "x-cookie": f"{cookie}",
+            "x-project-name": 'tokapi'
         }
-    }
+        response = requests.get(url, headers=get_headers)
 
-    get_headers = {
-        "accept": "application/json",
-        "x-api-key": f"{api_key}",
-        "x-proxy": f"{proxy}",
-        "x-device": f"{device}",
-        "x-cookie": f"{cookie}",
-        "x-project-name": 'tokapi'
-    }
+        if response.status_code == 200:
+            print(response.text)
+            data = json.loads(response.text)
+            user_id_acc = data['user']['uid']
 
-    response = requests.post(url, json=payload, headers=get_headers)
+        else:
+            print(f"Нет доступа к аккаунту {response.text}")
+            asyncio.run(database_bot.insert_trash_accs(account))
+            asyncio.run(database_bot.delete_account_cookie(account))
+            requests.get(
+                f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=646534367&text= Удалено из БД аккаунт {account}')
+            current_pid = os.getpid()
+            os.kill(current_pid, signal.SIGTERM)
+            print(f"Process  with PID {current_pid} killed.")
+            break
 
-    if response.status_code == 200:
-        print('Аккаунт успешно обновлен')
-        async with db.DatabaseBot("Database/db.db") as db_bot:
-            await db_bot.update_account_cookie(account)
+        url = f"https://api.tokapi.online/v1/user/{user_id_acc}/profile?app_version={version}"
 
-    else:
-        print(response.status_code)
-        print(response.text)
-        async with db.DatabaseBot("Database/db.db") as db_bot:
-            await db_bot.insert_trash_accs(account)
-        requests.get(
-            f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=646534367&text= Удалено из БД аккаунт {account}')
-        async with db.DatabaseBot("Database/db.db") as db_bot:
-            await db_bot.delete_account_cookie(account)
+        payload = {
+            "profile": {
+                "signature": f"{str(date_purchase)}"
+            }
+        }
+
+        get_headers = {
+            "accept": "application/json",
+            "x-api-key": f"{api_key}",
+            "x-proxy": f"{proxy}",
+            "x-device": f"{device}",
+            "x-cookie": f"{cookie}",
+            "x-project-name": 'tokapi'
+        }
+
+        response = requests.post(url, json=payload, headers=get_headers)
+
+        if response.status_code == 200:
+            print('Аккаунт успешно обновлен')
+            asyncio.run(database_bot.update_account_cookie(account))
+            current_pid = os.getpid()
+            os.kill(current_pid, signal.SIGTERM)
+            print(f"Process  with PID {current_pid} killed.")
+            break
+
+
+        else:
+            print(response.status_code)
+            print(response.text)
+            asyncio.run(database_bot.insert_trash_accs(account))
+            requests.get(
+                f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=646534367&text= Удалено из БД аккаунт {account}')
+            asyncio.run(database_bot.delete_account_cookie(account))
+            current_pid = os.getpid()
+            os.kill(current_pid, signal.SIGTERM)
+            print(f"Process  with PID {current_pid} killed.")
+            break

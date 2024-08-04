@@ -94,10 +94,40 @@ async def delete_old_items_periodically():
                 rest = await db_bot.get_cookie_accounts(value)
             print(rest[0])
             restt = rest[0]
-            await cbac.start_work(value)
+            loop = asyncio.get_running_loop()
+            with ThreadPoolExecutor() as executor:
+                await loop.run_in_executor(executor, start_processes, value)
+            #asyncio.run(cbac.start_work(value))
         print('Конец взаимодействия с куки')
 
         await asyncio.sleep(120)
+
+def start_processes(count_flows):
+    processes = []
+    p = multiprocessing.Process(
+        target=cbac.start_work,
+        args= (f"{count_flows}",),
+        name=f"Process-"
+    )
+    processes.append(p)
+    p.start()
+    print(f"Started {p.name}")
+    join_processes(processes)
+
+def join_processes(processes):
+    try:
+        for i, p in enumerate(processes):
+            print(f"Joining process {p.name}")
+            p.join()
+            # time.sleep(2) # возможно, это можно убрать
+    except Exception as e:
+        print(f"Error joining processes: {e}")
+    finally:
+        for p in processes:
+            if p.is_alive():
+                print(f"Terminating process {p.name}")
+                p.terminate()
+                p.join()
 
 def extract_accounts(country_code, count):
     tag = count
@@ -1090,6 +1120,7 @@ async def user_states_new_acc_buy(call: CallbackQuery, state: FSMContext):
         if call.data.startswith('backaccbuy_'):
             geo = call.data.split('_')[1]
             price = call.data.split('_')[2]
+            await state.finish()
             async with db.DatabaseBot("Database/db.db") as db_bot:
                 counts = await db_bot.get__geo(geo)
             message = (
