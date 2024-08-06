@@ -43,6 +43,8 @@ def get_proxy():
         print(f"Ошибка при чтении файла {PROXIES_FILE_PATH}:", e)
         requests.get(
             f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=646534367&text=Ошибка чтения из файла прокси')
+        requests.get(
+            f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=6864888389&text=Ошибка чтения из файла прокси')
         return None
 
 def start_work(account):
@@ -62,12 +64,13 @@ def start_work(account):
 
         proxy, refresh_link = next(get_proxy())
 
+        #proxy = "http://sdAMgSjR:K8NtgURn@46.174.110.126:62854"
         print(proxy)
-
+        print(1)
         print(proxy)
         date_purchase = datetime.now().strftime('%Y-%m-%d %H:%M')
-        print(device)
-        print(cookie)
+        print("DEVICE",device)
+        print("Cookie",cookie)
         url = f"https://api.tokapi.online/v1/user/self?app_version={version}"
         get_headers = {
             "accept": "application/json",
@@ -80,9 +83,114 @@ def start_work(account):
         response = requests.get(url, headers=get_headers)
 
         if response.status_code == 200:
-            print(response.text)
-            data = json.loads(response.text)
-            user_id_acc = data['user']['uid']
+            try:
+                print(response.text)
+                print('opa')
+                data = json.loads(response.text)
+                print(data)
+                user_id_acc = data['user']['uid']
+                url = f"https://api.tokapi.online/v1/user/{user_id_acc}/profile?app_version={version}"
+
+                payload = {
+                    "profile": {
+                        "signature": f"{str(date_purchase)}"
+                    }
+                }
+
+                get_headers = {
+                    "accept": "application/json",
+                    "x-api-key": f"{api_key}",
+                    "x-proxy": f"{proxy}",
+                    "x-device": f"{device}",
+                    "x-cookie": f"{cookie}",
+                    "x-project-name": 'tokapi'
+                }
+
+                response = requests.post(url, json=payload, headers=get_headers)
+                print(response.text)
+                parsed_data = json.loads(response.text)
+                #data = json.loads(response.text)
+                if parsed_data["status_msg"]:
+                    asyncio.run(database_bot.delete_account_cookie(account))
+                    requests.get(
+                        f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=646534367&text= Удалено из БД аккаунт {account}. Slowdown')
+                    #requests.get(
+                       # f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=6864888389&text= Удалено из БД аккаунт {account}')
+                    current_pid = os.getpid()
+                    os.kill(current_pid, signal.SIGTERM)
+                    print(f"Process  with PID {current_pid} killed.")
+                    break
+                elif response.status_code == 200:
+                    url = f"https://api.tokapi.online/v1/user/{user_id_acc}"
+                    get_headers = {
+                        "accept": "application/json",
+                        "x-api-key": f"{api_key}",
+                        "region": f"{geo_acc}",
+                        "x-project-name": 'tokapi'
+                    }
+                    response = requests.get(url, headers=get_headers)
+
+                    if response.status_code == 200:
+                        data = json.loads(response.text)
+                        user_id_signater = data['user']['signature']
+                        print(user_id_signater)
+                        if user_id_signater == str(date_purchase):
+                            print("Совпали")
+                            print('Аккаунт успешно обновлен')
+                            asyncio.run(database_bot.update_account_cookie(account))
+                            current_pid = os.getpid()
+                            os.kill(current_pid, signal.SIGTERM)
+                            print(f"Process  with PID {current_pid} killed.")
+                            break
+
+                    else:
+                        print(response.status_code)
+                        print(response.text)
+                        asyncio.run(database_bot.insert_trash_accs(str(account)))
+                        requests.get(
+                            f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=646534367&text= Удалено из БД аккаунт {account}')
+                        requests.get(
+                            f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=6864888389&text= Удалено из БД аккаунт {account}')
+                        asyncio.run(database_bot.delete_account_cookie(account))
+                        current_pid = os.getpid()
+                        os.kill(current_pid, signal.SIGTERM)
+                        print(f"Process  with PID {current_pid} killed.")
+                        break
+                else:
+                    print(response.status_code)
+                    print(response.text)
+                    asyncio.run(database_bot.insert_trash_accs(account))
+                    requests.get(
+                        f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=646534367&text= Удалено из БД аккаунт {account}')
+                    requests.get(
+                        f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=6864888389&text= Удалено из БД аккаунт {account}')
+                    asyncio.run(database_bot.delete_account_cookie(account))
+                    current_pid = os.getpid()
+                    os.kill(current_pid, signal.SIGTERM)
+                    print(f"Process  with PID {current_pid} killed.")
+                    break
+
+            except:
+                print(f"Нет доступа к аккаунту {response.text}")
+                data = json.loads(response.text)
+                error = data.get("error")
+                print(error)
+                if error:
+                    requests.get(
+                        f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=646534367&text=Что то не так с прокси')
+                    requests.get(
+                        f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=6864888389&text=Что то не так с прокси')
+                    break
+                asyncio.run(database_bot.delete_account_cookie(account))
+                requests.get(
+                    f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=646534367&text= Удалено из БД аккаунт {account}')
+                requests.get(
+                    f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=6864888389&text= Удалено из БД аккаунт {account}')
+                current_pid = os.getpid()
+                os.kill(current_pid, signal.SIGTERM)
+                print(f"Process  with PID {current_pid} killed.")
+                break
+
 
         else:
             print(f"Нет доступа к аккаунту {response.text}")
@@ -90,47 +198,13 @@ def start_work(account):
             asyncio.run(database_bot.delete_account_cookie(account))
             requests.get(
                 f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=646534367&text= Удалено из БД аккаунт {account}')
-            current_pid = os.getpid()
-            os.kill(current_pid, signal.SIGTERM)
-            print(f"Process  with PID {current_pid} killed.")
-            break
-
-        url = f"https://api.tokapi.online/v1/user/{user_id_acc}/profile?app_version={version}"
-
-        payload = {
-            "profile": {
-                "signature": f"{str(date_purchase)}"
-            }
-        }
-
-        get_headers = {
-            "accept": "application/json",
-            "x-api-key": f"{api_key}",
-            "x-proxy": f"{proxy}",
-            "x-device": f"{device}",
-            "x-cookie": f"{cookie}",
-            "x-project-name": 'tokapi'
-        }
-
-        response = requests.post(url, json=payload, headers=get_headers)
-
-        if response.status_code == 200:
-            print('Аккаунт успешно обновлен')
-            asyncio.run(database_bot.update_account_cookie(account))
-            current_pid = os.getpid()
-            os.kill(current_pid, signal.SIGTERM)
-            print(f"Process  with PID {current_pid} killed.")
-            break
-
-
-        else:
-            print(response.status_code)
-            print(response.text)
-            asyncio.run(database_bot.insert_trash_accs(account))
             requests.get(
-                f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=646534367&text= Удалено из БД аккаунт {account}')
-            asyncio.run(database_bot.delete_account_cookie(account))
+                f'https://api.telegram.org/bot{config.bot_token}/sendMessage?chat_id=6864888389&text= Удалено из БД аккаунт {account}')
             current_pid = os.getpid()
             os.kill(current_pid, signal.SIGTERM)
             print(f"Process  with PID {current_pid} killed.")
             break
+
+
+
+

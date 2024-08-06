@@ -55,6 +55,8 @@ def random_string(length):
     return ''.join(random.choice(letters) for _ in range(length))
 
 
+process_lock = asyncio.Lock()
+
 async def delete_old_items_periodically():
     while True:
         print(f'Начало очистки в {datetime.today()}')
@@ -62,7 +64,7 @@ async def delete_old_items_periodically():
             tems = await db_bot.get_old_items()
             if tems:  # Проверка, что список не пуст
                 tems_json_str = tems[0]
-                        # Преобразуем JSON-строку обратно в список Python
+                # Преобразуем JSON-строку обратно в список Python
                 tems_list = json.loads(tems_json_str)
                 # Выводим список в нужном формате
                 print(tems_list)
@@ -92,12 +94,25 @@ async def delete_old_items_periodically():
             print(value)
             async with db.DatabaseBot("Database/db.db") as db_bot:
                 rest = await db_bot.get_cookie_accounts(value)
-            print(rest[0])
+            if rest:
+                print(rest[0])
+                restt = rest[0]
+                async with process_lock:
+                    loop = asyncio.get_running_loop()
+                    with ThreadPoolExecutor() as executor:
+                        await loop.run_in_executor(executor, start_processes, value)
+                # asyncio.run(cbac.start_work(value))
+            else:
+                print(f"No cookie accounts found {value}")
+            '''print(rest[0])
             restt = rest[0]
-            loop = asyncio.get_running_loop()
-            with ThreadPoolExecutor() as executor:
-                await loop.run_in_executor(executor, start_processes, value)
-            #asyncio.run(cbac.start_work(value))
+
+            # Use the lock to ensure only one process runs at a time
+            async with process_lock:
+                loop = asyncio.get_running_loop()
+                with ThreadPoolExecutor() as executor:
+                    await loop.run_in_executor(executor, start_processes, value)
+            # asyncio.run(cbac.start_work(value))'''
         print('Конец взаимодействия с куки')
 
         await asyncio.sleep(120)
@@ -106,7 +121,7 @@ def start_processes(count_flows):
     processes = []
     p = multiprocessing.Process(
         target=cbac.start_work,
-        args= (f"{count_flows}",),
+        args=(f"{count_flows}",),
         name=f"Process-"
     )
     processes.append(p)
@@ -128,7 +143,6 @@ def join_processes(processes):
                 print(f"Terminating process {p.name}")
                 p.terminate()
                 p.join()
-
 def extract_accounts(country_code, count):
     tag = count
     with open('accounts.txt', 'r') as file:
@@ -247,7 +261,6 @@ async def text(message:types.Message):
             items = await db_bot.get_items(message.chat.id)
         print(f"{items}\n↑ items")
         total_amount = 0.0
-        # Итерация по каждому кортежу
         for item in items:
             id_value, country, amount = item
             # Сложение amount

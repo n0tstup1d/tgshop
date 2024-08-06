@@ -537,7 +537,7 @@ class DatabaseBot:
             await self.db.execute('''
                 INSERT INTO trash_accs_cookie (trash_accs)
                 VALUES (?)
-            ''', (sum_purchase))
+            ''', (sum_purchase,))
             await self.db.commit()
 
     async def insert_check(self, sum_purchase, number_check, user_id, string):
